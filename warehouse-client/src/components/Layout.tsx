@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { LayoutDashboard, Building2, Warehouse, PackageSearch, BarChart3, Users, LogOut, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Building2, Warehouse, PackageSearch, BarChart3, Users, Receipt, LogOut, KeyRound } from 'lucide-react';
 
 const NAV_ITEMS = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
 
 const ADMIN_NAV_ITEMS = [
     { to: '/users', label: 'Users', icon: Users },
+    { to: '/invoices', label: 'Invoices', icon: Receipt },
 ];
 
 const Layout: React.FC = () => {
