@@ -4,6 +4,9 @@ import { computeInvoiceAmounts } from '../utils/invoiceCalc';
 
 const SSCL_RATE = parseFloat(process.env.SSCL_RATE || '0.025641');
 const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.18');
+if (isNaN(SSCL_RATE) || isNaN(VAT_RATE)) {
+    throw new Error('SSCL_RATE and VAT_RATE must be valid numbers. Check warehouse-server/.env.');
+}
 
 async function computeBreakdown(department_id: number, period_from: string, period_to: string) {
     const deptResult = await execute<any>(
@@ -120,7 +123,10 @@ export const createInvoice = async (req: Request, res: Response) => {
             }
         );
         res.status(201).json(result.rows[0]);
-    } catch (err) {
+    } catch (err: any) {
+        if (err.code === '23505') {
+            return res.status(409).json({ message: 'An invoice for this department and period has already been saved' });
+        }
         console.error('createInvoice error:', err);
         res.status(500).json({ message: 'Server error' });
     }

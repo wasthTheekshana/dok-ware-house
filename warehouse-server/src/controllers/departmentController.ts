@@ -19,7 +19,14 @@ export const getDepartments = async (req: Request, res: Response) => {
         }
         query += ` ORDER BY d.name`;
         const result = await execute<any>(query, params);
-        res.json(result.rows);
+        const isAdmin = (req as any).user?.role === 'admin';
+        const rows = isAdmin
+            ? result.rows
+            : result.rows.map((row: any) => {
+                const { PRICE_PER_ARCHIVED_BOX, PRICE_PER_RETRIEVED_BOX, PRICE_PER_EMPTY_CARTON, ...rest } = row;
+                return rest;
+            });
+        res.json(rows);
     } catch (err) {
         console.error('getDepartments error:', err);
         res.status(500).json({ message: 'Server error' });

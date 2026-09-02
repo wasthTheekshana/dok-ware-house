@@ -6,6 +6,9 @@ export const invoicePeriodSchema = z.object({
     department_id: z.number().int().positive(),
     period_from: dateStr,
     period_to: dateStr,
+}).refine(data => data.period_from <= data.period_to, {
+    message: 'period_from must be on or before period_to',
+    path: ['period_to'],
 });
 
 export const invoiceQuerySchema = z.object({

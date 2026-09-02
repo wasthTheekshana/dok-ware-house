@@ -36,7 +36,13 @@ export const getCompanyById = async (req: Request, res: Response) => {
              ORDER BY d.name`,
             [req.params.id]
         );
-        company.DEPARTMENTS = deptResult.rows;
+        const isAdmin = (req as any).user?.role === 'admin';
+        company.DEPARTMENTS = isAdmin
+            ? deptResult.rows
+            : deptResult.rows.map((row: any) => {
+                const { PRICE_PER_ARCHIVED_BOX, PRICE_PER_RETRIEVED_BOX, PRICE_PER_EMPTY_CARTON, ...rest } = row;
+                return rest;
+            });
 
         res.json(company);
     } catch (err) {

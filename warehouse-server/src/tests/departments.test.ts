@@ -102,4 +102,37 @@ describe('Departments API', () => {
         expect(res.status).toBe(200);
         expect(res.body.PRICE_PER_ARCHIVED_BOX).toBe(50);
     });
+
+    it('GET strips pricing fields for a non-admin user', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 1, role: 'staff' };
+                next();
+            },
+            requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
+
+        mockExecute.mockResolvedValueOnce({
+            rows: [{ ID: 10, NAME: 'CASH DEPT', PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20 }],
+        });
+
+        const staffRoutes = require('../routes/departmentRoutes').default;
+        const staffApp = express();
+        staffApp.use(express.json());
+        staffApp.use('/api/departments', staffRoutes);
+
+        const res = await request(staffApp).get('/api/departments');
+
+        expect(res.status).toBe(200);
+        expect(res.body[0].NAME).toBe('CASH DEPT');
+        expect(res.body[0].PRICE_PER_ARCHIVED_BOX).toBeUndefined();
+        expect(res.body[0].PRICE_PER_RETRIEVED_BOX).toBeUndefined();
+        expect(res.body[0].PRICE_PER_EMPTY_CARTON).toBeUndefined();
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
 });

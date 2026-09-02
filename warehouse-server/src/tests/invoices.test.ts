@@ -58,6 +58,13 @@ describe('POST /api/invoices/preview', () => {
         expect(res.status).toBe(400);
         expect(mockExecute).not.toHaveBeenCalled();
     });
+
+    it('rejects a period_from after period_to', async () => {
+        const res = await request(app).post('/api/invoices/preview').send({ department_id: 1, period_from: '2026-07-31', period_to: '2026-07-01' });
+
+        expect(res.status).toBe(400);
+        expect(mockExecute).not.toHaveBeenCalled();
+    });
 });
 
 describe('POST /api/invoices', () => {
@@ -84,6 +91,19 @@ describe('POST /api/invoices', () => {
         const res = await request(app).post('/api/invoices').send(VALID_BODY);
 
         expect(res.status).toBe(404);
+    });
+
+    it('returns 409 when an invoice for this department and period already exists', async () => {
+        const err: any = new Error('Duplicate key');
+        err.code = '23505';
+        mockExecute
+            .mockResolvedValueOnce({ rows: [DEPT_ROW] })
+            .mockResolvedValueOnce({ rows: [{ EVENT_TYPE: 'archived', TOTAL: 100 }] })
+            .mockRejectedValueOnce(err);
+
+        const res = await request(app).post('/api/invoices').send(VALID_BODY);
+
+        expect(res.status).toBe(409);
     });
 });
 
