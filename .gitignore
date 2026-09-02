@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+
+# Superpowers session workspace (git-ignored scratch)
+.superpowers/
