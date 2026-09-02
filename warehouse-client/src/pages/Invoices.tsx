@@ -123,11 +123,11 @@ const Invoices: React.FC = () => {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-600 mb-1">Period From</label>
-                    <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} />
+                    <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={periodFrom} onChange={(e) => { setPeriodFrom(e.target.value); setPreview(null); }} />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-600 mb-1">Period To</label>
-                    <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} />
+                    <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={periodTo} onChange={(e) => { setPeriodTo(e.target.value); setPreview(null); }} />
                 </div>
                 <button
                     onClick={handlePreview}

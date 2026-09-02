@@ -64,11 +64,11 @@ const CompanyDetail: React.FC = () => {
 
     const saveEditDept = async (deptId: number) => {
         try {
-            await api.put(`/departments/${deptId}`, {
-                price_per_archived_box: Number(editArchivedPrice),
-                price_per_retrieved_box: Number(editRetrievedPrice),
-                price_per_empty_carton: Number(editEmptyCartonPrice),
-            });
+            const body: Record<string, number> = {};
+            if (editArchivedPrice !== '') body.price_per_archived_box = Number(editArchivedPrice);
+            if (editRetrievedPrice !== '') body.price_per_retrieved_box = Number(editRetrievedPrice);
+            if (editEmptyCartonPrice !== '') body.price_per_empty_carton = Number(editEmptyCartonPrice);
+            await api.put(`/departments/${deptId}`, body);
             toast.success('Pricing updated');
             setEditingDeptId(null);
             load();
