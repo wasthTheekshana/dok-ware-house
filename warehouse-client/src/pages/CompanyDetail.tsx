@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Pencil, Check, X } from 'lucide-react';
 import api from '../services/api';
-import type { Company, Warehouse } from '../types';
+import type { Company, Warehouse, Department } from '../types';
 
 const CompanyDetail: React.FC = () => {
     const { id } = useParams();
@@ -13,6 +14,11 @@ const CompanyDetail: React.FC = () => {
     const [deptName, setDeptName] = useState('');
     const [deptCode, setDeptCode] = useState('');
     const [deptWarehouseId, setDeptWarehouseId] = useState('');
+
+    const [editingDeptId, setEditingDeptId] = useState<number | null>(null);
+    const [editArchivedPrice, setEditArchivedPrice] = useState('');
+    const [editRetrievedPrice, setEditRetrievedPrice] = useState('');
+    const [editEmptyCartonPrice, setEditEmptyCartonPrice] = useState('');
 
     const load = () => {
         setLoading(true);
@@ -44,6 +50,30 @@ const CompanyDetail: React.FC = () => {
             load();
         } catch (err: any) {
             toast.error(err?.response?.data?.message || 'Failed to create department');
+        }
+    };
+
+    const startEditDept = (d: Department) => {
+        setEditingDeptId(d.ID);
+        setEditArchivedPrice(String(d.PRICE_PER_ARCHIVED_BOX ?? 0));
+        setEditRetrievedPrice(String(d.PRICE_PER_RETRIEVED_BOX ?? 0));
+        setEditEmptyCartonPrice(String(d.PRICE_PER_EMPTY_CARTON ?? 0));
+    };
+
+    const cancelEditDept = () => setEditingDeptId(null);
+
+    const saveEditDept = async (deptId: number) => {
+        try {
+            await api.put(`/departments/${deptId}`, {
+                price_per_archived_box: Number(editArchivedPrice),
+                price_per_retrieved_box: Number(editRetrievedPrice),
+                price_per_empty_carton: Number(editEmptyCartonPrice),
+            });
+            toast.success('Pricing updated');
+            setEditingDeptId(null);
+            load();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'Failed to update pricing');
         }
     };
 
@@ -97,17 +127,51 @@ const CompanyDetail: React.FC = () => {
                             <th className="p-3">Code</th>
                             <th className="p-3">Warehouse</th>
                             <th className="p-3">Current Box Count</th>
+                            <th className="p-3">Price/Archived</th>
+                            <th className="p-3">Price/Retrieved</th>
+                            <th className="p-3">Price/Empty Carton</th>
+                            <th className="p-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {(company.DEPARTMENTS || []).map((d) => (
-                            <tr key={d.ID} className="border-t border-slate-100">
-                                <td className="p-3">{d.NAME}</td>
-                                <td className="p-3">{d.CODE}</td>
-                                <td className="p-3">{d.WAREHOUSE_NAME}</td>
-                                <td className="p-3">{d.CURRENT_BOX_COUNT}</td>
-                            </tr>
-                        ))}
+                        {(company.DEPARTMENTS || []).map((d) =>
+                            editingDeptId === d.ID ? (
+                                <tr key={d.ID} className="border-t border-slate-100 bg-slate-50">
+                                    <td className="p-3">{d.NAME}</td>
+                                    <td className="p-3">{d.CODE}</td>
+                                    <td className="p-3">{d.WAREHOUSE_NAME}</td>
+                                    <td className="p-3">{d.CURRENT_BOX_COUNT}</td>
+                                    <td className="p-2">
+                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editArchivedPrice} onChange={(e) => setEditArchivedPrice(e.target.value)} />
+                                    </td>
+                                    <td className="p-2">
+                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editRetrievedPrice} onChange={(e) => setEditRetrievedPrice(e.target.value)} />
+                                    </td>
+                                    <td className="p-2">
+                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editEmptyCartonPrice} onChange={(e) => setEditEmptyCartonPrice(e.target.value)} />
+                                    </td>
+                                    <td className="p-2">
+                                        <div className="flex gap-2">
+                                            <button onClick={() => saveEditDept(d.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
+                                            <button onClick={cancelEditDept} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                <tr key={d.ID} className="border-t border-slate-100">
+                                    <td className="p-3">{d.NAME}</td>
+                                    <td className="p-3">{d.CODE}</td>
+                                    <td className="p-3">{d.WAREHOUSE_NAME}</td>
+                                    <td className="p-3">{d.CURRENT_BOX_COUNT}</td>
+                                    <td className="p-3">{d.PRICE_PER_ARCHIVED_BOX}</td>
+                                    <td className="p-3">{d.PRICE_PER_RETRIEVED_BOX}</td>
+                                    <td className="p-3">{d.PRICE_PER_EMPTY_CARTON}</td>
+                                    <td className="p-3">
+                                        <button onClick={() => startEditDept(d)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                                    </td>
+                                </tr>
+                            )
+                        )}
                     </tbody>
                 </table>
             </div>

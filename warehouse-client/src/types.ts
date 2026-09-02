@@ -61,6 +61,34 @@ export interface Department {
     CODE: string | null;
     STATUS: 'active' | 'inactive';
     CURRENT_BOX_COUNT: number;
+    PRICE_PER_ARCHIVED_BOX: number;
+    PRICE_PER_RETRIEVED_BOX: number;
+    PRICE_PER_EMPTY_CARTON: number;
+}
+
+export interface InvoiceBreakdown {
+    DEPARTMENT_ID: number;
+    COMPANY_ID: number;
+    DEPARTMENT_NAME: string;
+    COMPANY_NAME: string;
+    PERIOD_FROM: string;
+    PERIOD_TO: string;
+    ARCHIVED_COUNT: number;
+    RETRIEVED_COUNT: number;
+    EMPTY_CARTON_COUNT: number;
+    PRICE_PER_ARCHIVED_BOX: number;
+    PRICE_PER_RETRIEVED_BOX: number;
+    PRICE_PER_EMPTY_CARTON: number;
+    SUBTOTAL: number;
+    SSCL_AMOUNT: number;
+    VAT_AMOUNT: number;
+    TOTAL_AMOUNT: number;
+}
+
+export interface Invoice extends InvoiceBreakdown {
+    ID: number;
+    CREATED_AT: string;
+    CREATED_BY: number | null;
 }
 
 export type BoxEventType = 'archived' | 'retrieved' | 'empty_carton_issued';
