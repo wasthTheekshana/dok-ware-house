@@ -87,3 +87,35 @@ describe('Warehouses API', () => {
         expect(res.status).toBe(404);
     });
 });
+
+describe('Warehouses API — admin-only write gating (real requireRole)', () => {
+    const { requireRole: realRequireRole } = jest.requireActual('../middleware/authMiddleware');
+
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('POST /api/warehouses returns 403 for a non-admin user', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 1, role: 'staff' };
+                next();
+            },
+            requireRole: realRequireRole,
+        }));
+        jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
+
+        const staffRoutes = require('../routes/warehouseRoutes').default;
+        const staffApp = express();
+        staffApp.use(express.json());
+        staffApp.use('/api/warehouses', staffRoutes);
+
+        const res = await request(staffApp).post('/api/warehouses').send({ name: 'Dagonna' });
+
+        expect(res.status).toBe(403);
+        expect(mockExecute).not.toHaveBeenCalled();
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});

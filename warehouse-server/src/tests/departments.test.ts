@@ -35,6 +35,13 @@ describe('Departments API', () => {
         expect(mockExecute).toHaveBeenCalledTimes(1);
     });
 
+    it('POST rejects when warehouse_id is missing', async () => {
+        const res = await request(app).post('/api/departments').send({ company_id: 1, name: 'CASH DEPT' });
+
+        expect(res.status).toBe(400);
+        expect(mockExecute).not.toHaveBeenCalled();
+    });
+
     it('POST rejects when warehouse_id does not exist', async () => {
         mockExecute
             .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // company check passes

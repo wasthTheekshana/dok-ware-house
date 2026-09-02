@@ -31,6 +31,8 @@ npm run seed            # creates schema + admin/password123
 npm run dev              # http://localhost:5100
 ```
 
+> **Note:** Schema changes in this app go directly into `CREATE TABLE IF NOT EXISTS` statements (no migrations yet, since there's no production deployment). If you have an existing `dok_warehouse` database from before the Warehouses module was added, `DROP` it and let `npm run seed` recreate it fresh — an old database will NOT automatically gain the new `warehouses` table or `departments.warehouse_id` column, and department-related endpoints will fail with a "column does not exist" error until you do.
+
 ### 3. Frontend
 
 ```bash
