@@ -11,6 +11,15 @@ export interface LoginResponse {
     user: WhUser;
 }
 
+export interface AppUser {
+    ID: number;
+    USERNAME: string;
+    NAME: string;
+    ROLE: 'admin' | 'staff';
+    STATUS: 'active' | 'inactive';
+    CREATED_AT: string;
+}
+
 export interface Company {
     ID: number;
     NAME: string;
