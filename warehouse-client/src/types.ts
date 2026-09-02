@@ -25,9 +25,29 @@ export interface Company {
     DEPARTMENTS?: Department[];
 }
 
+export interface Warehouse {
+    ID: number;
+    NAME: string;
+    CODE: string | null;
+    ADDRESS: string | null;
+    STATUS: 'active' | 'inactive';
+    DEPARTMENT_COUNT?: number;
+    DEPARTMENTS?: {
+        ID: number;
+        NAME: string;
+        CODE: string | null;
+        STATUS: 'active' | 'inactive';
+        CURRENT_BOX_COUNT: number;
+        COMPANY_ID: number;
+        COMPANY_NAME: string;
+    }[];
+}
+
 export interface Department {
     ID: number;
     COMPANY_ID: number;
+    WAREHOUSE_ID: number;
+    WAREHOUSE_NAME?: string;
     NAME: string;
     CODE: string | null;
     STATUS: 'active' | 'inactive';

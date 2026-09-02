@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
+import Warehouses from './pages/Warehouses';
 import BoxEvents from './pages/BoxEvents';
 import Reports from './pages/Reports';
 
@@ -39,6 +40,7 @@ function AppRoutes() {
                     <Route index element={<Dashboard />} />
                     <Route path="companies" element={<Companies />} />
                     <Route path="companies/:id" element={<CompanyDetail />} />
+                    <Route path="warehouses" element={<Warehouses />} />
                     <Route path="box-events" element={<BoxEvents />} />
                     <Route path="reports" element={<Reports />} />
                 </Route>

@@ -1,11 +1,12 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Building2, PackageSearch, BarChart3, LogOut } from 'lucide-react';
+import { LayoutDashboard, Building2, Warehouse, PackageSearch, BarChart3, LogOut } from 'lucide-react';
 
 const NAV_ITEMS = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/companies', label: 'Companies', icon: Building2 },
+    { to: '/warehouses', label: 'Warehouses', icon: Warehouse },
     { to: '/box-events', label: 'Box Events', icon: PackageSearch },
     { to: '/reports', label: 'Reports', icon: BarChart3 },
 ];
