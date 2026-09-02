@@ -87,4 +87,19 @@ describe('Departments API', () => {
 
         expect(res.status).toBe(409);
     });
+
+    it('PUT /api/departments/:id accepts pricing fields', async () => {
+        mockExecute.mockResolvedValueOnce({
+            rows: [{ ID: 1, PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20 }],
+        });
+
+        const res = await request(app).put('/api/departments/1').send({
+            price_per_archived_box: 50,
+            price_per_retrieved_box: 45,
+            price_per_empty_carton: 20,
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body.PRICE_PER_ARCHIVED_BOX).toBe(50);
+    });
 });

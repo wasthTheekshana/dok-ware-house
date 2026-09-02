@@ -6,6 +6,7 @@ export const getDepartments = async (req: Request, res: Response) => {
     try {
         let query = `
             SELECT d.id, d.company_id, d.warehouse_id, d.name, d.code, d.status, d.current_box_count,
+                   d.price_per_archived_box, d.price_per_retrieved_box, d.price_per_empty_carton,
                    w.name AS warehouse_name
             FROM departments d
             JOIN warehouses w ON w.id = d.warehouse_id
