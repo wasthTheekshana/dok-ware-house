@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
+import warehouseRoutes from './routes/warehouseRoutes';
 import departmentRoutes from './routes/departmentRoutes';
 import boxEventRoutes from './routes/boxEventRoutes';
 import summaryRoutes from './routes/summaryRoutes';
@@ -13,6 +14,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/box-events', boxEventRoutes);
 app.use('/api/summary', summaryRoutes);
