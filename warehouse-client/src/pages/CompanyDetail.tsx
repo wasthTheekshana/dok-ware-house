@@ -2,19 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import type { Company } from '../types';
+import type { Company, Warehouse } from '../types';
 
 const CompanyDetail: React.FC = () => {
     const { id } = useParams();
     const [company, setCompany] = useState<Company | null>(null);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [deptName, setDeptName] = useState('');
     const [deptCode, setDeptCode] = useState('');
+    const [deptWarehouseId, setDeptWarehouseId] = useState('');
 
     const load = () => {
         setLoading(true);
-        api.get<Company>(`/companies/${id}`).then((res) => setCompany(res.data)).finally(() => setLoading(false));
+        Promise.all([
+            api.get<Company>(`/companies/${id}`),
+            api.get<Warehouse[]>('/warehouses'),
+        ]).then(([companyRes, warehousesRes]) => {
+            setCompany(companyRes.data);
+            setWarehouses(warehousesRes.data);
+        }).finally(() => setLoading(false));
     };
 
     useEffect(load, [id]);
@@ -22,14 +30,20 @@ const CompanyDetail: React.FC = () => {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await api.post('/departments', { company_id: Number(id), name: deptName, code: deptCode || undefined });
+            await api.post('/departments', {
+                company_id: Number(id),
+                warehouse_id: Number(deptWarehouseId),
+                name: deptName,
+                code: deptCode || undefined,
+            });
             toast.success('Department created');
             setDeptName('');
             setDeptCode('');
+            setDeptWarehouseId('');
             setShowForm(false);
             load();
-        } catch {
-            toast.error('Failed to create department');
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'Failed to create department');
         }
     };
 
@@ -60,6 +74,15 @@ const CompanyDetail: React.FC = () => {
                         <label className="block text-sm font-medium text-slate-600 mb-1">Code</label>
                         <input className="border border-slate-300 rounded-lg px-3 py-2" value={deptCode} onChange={(e) => setDeptCode(e.target.value)} />
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
+                        <select className="border border-slate-300 rounded-lg px-3 py-2" value={deptWarehouseId} onChange={(e) => setDeptWarehouseId(e.target.value)} required>
+                            <option value="">Select...</option>
+                            {warehouses.map((w) => (
+                                <option key={w.ID} value={w.ID}>{w.NAME}</option>
+                            ))}
+                        </select>
+                    </div>
                     <button type="submit" className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700">
                         Save
                     </button>
@@ -72,6 +95,7 @@ const CompanyDetail: React.FC = () => {
                         <tr>
                             <th className="p-3">Name</th>
                             <th className="p-3">Code</th>
+                            <th className="p-3">Warehouse</th>
                             <th className="p-3">Current Box Count</th>
                         </tr>
                     </thead>
@@ -80,6 +104,7 @@ const CompanyDetail: React.FC = () => {
                             <tr key={d.ID} className="border-t border-slate-100">
                                 <td className="p-3">{d.NAME}</td>
                                 <td className="p-3">{d.CODE}</td>
+                                <td className="p-3">{d.WAREHOUSE_NAME}</td>
                                 <td className="p-3">{d.CURRENT_BOX_COUNT}</td>
                             </tr>
                         ))}
