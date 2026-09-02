@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { execute } from '../db/dbUtils';
-import { hashPassword } from '../utils/authUtils';
+import { hashPassword, comparePassword } from '../utils/authUtils';
 import { wouldRemoveLastAdmin } from '../utils/adminGuard';
 
 export const getUsers = async (req: Request, res: Response) => {
@@ -85,6 +85,27 @@ export const updateUser = async (req: Request, res: Response) => {
         res.json(result.rows[0]);
     } catch (err) {
         console.error('updateUser error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+export const changeOwnPassword = async (req: Request, res: Response) => {
+    const { current_password, new_password } = req.body;
+    const userId = (req as any).user?.id;
+    try {
+        const result = await execute<any>(`SELECT password_hash FROM users WHERE id = :id`, [userId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const isMatch = await comparePassword(current_password, result.rows[0].PASSWORD_HASH);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Current password is incorrect' });
+        }
+        const newHash = await hashPassword(new_password);
+        await execute(`UPDATE users SET password_hash = :password_hash WHERE id = :id`, { password_hash: newHash, id: userId });
+        res.json({ message: 'Password updated' });
+    } catch (err) {
+        console.error('changeOwnPassword error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 };

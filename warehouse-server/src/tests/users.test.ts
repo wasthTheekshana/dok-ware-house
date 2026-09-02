@@ -20,8 +20,10 @@ jest.mock('../utils/authUtils', () => ({
 
 import userRoutes from '../routes/userRoutes';
 import { execute } from '../db/dbUtils';
+import { comparePassword } from '../utils/authUtils';
 
 const mockExecute = execute as jest.Mock;
+const mockComparePassword = comparePassword as jest.Mock;
 
 const app = express();
 app.use(express.json());
@@ -159,5 +161,43 @@ describe('Users API — admin-only gating (real requireRole)', () => {
         jest.dontMock('../middleware/authMiddleware');
         jest.dontMock('../db/dbUtils');
         jest.resetModules();
+    });
+});
+
+describe('POST /api/users/me/change-password', () => {
+    beforeEach(() => {
+        mockExecute.mockReset();
+        mockComparePassword.mockReset();
+    });
+
+    it('rejects an incorrect current password', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [{ PASSWORD_HASH: 'hashed:oldpass' }] });
+        mockComparePassword.mockResolvedValueOnce(false);
+
+        const res = await request(app).post('/api/users/me/change-password').send({ current_password: 'wrong', new_password: 'newpass123' });
+
+        expect(res.status).toBe(401);
+        expect(mockExecute).toHaveBeenCalledTimes(1); // no UPDATE ran
+    });
+
+    it('updates the password when the current password is correct', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ PASSWORD_HASH: 'hashed:oldpass' }] })
+            .mockResolvedValueOnce({ rows: [] }); // UPDATE
+        mockComparePassword.mockResolvedValueOnce(true);
+
+        const res = await request(app).post('/api/users/me/change-password').send({ current_password: 'oldpass', new_password: 'newpass123' });
+
+        expect(res.status).toBe(200);
+        const updateCall = mockExecute.mock.calls[1];
+        expect(updateCall[0]).toMatch(/UPDATE users SET password_hash/);
+        expect(updateCall[1].password_hash).toBe('hashed:newpass123');
+    });
+
+    it('rejects a body with no new_password', async () => {
+        const res = await request(app).post('/api/users/me/change-password').send({ current_password: 'oldpass' });
+
+        expect(res.status).toBe(400);
+        expect(mockExecute).not.toHaveBeenCalled();
     });
 });

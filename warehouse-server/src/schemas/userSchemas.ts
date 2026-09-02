@@ -13,3 +13,8 @@ export const updateUserSchema = z.object({
     status: z.enum(['active', 'inactive']).optional(),
     password: z.string().min(6).max(255).optional(),
 }).refine(data => Object.keys(data).length > 0, { message: 'At least one field required' });
+
+export const changePasswordSchema = z.object({
+    current_password: z.string().min(1),
+    new_password: z.string().min(6).max(255),
+});
