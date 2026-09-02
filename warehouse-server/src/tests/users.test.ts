@@ -10,7 +10,13 @@ jest.mock('../middleware/authMiddleware', () => ({
     requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
+jest.mock('../db/dbUtils', () => {
+    const execute = jest.fn();
+    return {
+        execute,
+        withTransaction: jest.fn(async (fn: any) => fn(execute)),
+    };
+});
 jest.mock('../utils/authUtils', () => ({
     hashPassword: jest.fn(async (pw: string) => `hashed:${pw}`),
     comparePassword: jest.fn(),
@@ -176,7 +182,7 @@ describe('POST /api/users/me/change-password', () => {
 
         const res = await request(app).post('/api/users/me/change-password').send({ current_password: 'wrong', new_password: 'newpass123' });
 
-        expect(res.status).toBe(401);
+        expect(res.status).toBe(403);
         expect(mockExecute).toHaveBeenCalledTimes(1); // no UPDATE ran
     });
 
