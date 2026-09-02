@@ -146,7 +146,7 @@ const BoxEvents: React.FC = () => {
                     <select className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} required disabled={!selectedCompany}>
                         <option value="">Select...</option>
                         {departments.map((d) => (
-                            <option key={d.ID} value={d.ID}>{d.NAME} ({d.CURRENT_BOX_COUNT})</option>
+                            <option key={d.ID} value={d.ID}>{d.NAME} — {d.WAREHOUSE_NAME} ({d.CURRENT_BOX_COUNT})</option>
                         ))}
                     </select>
                 </div>
