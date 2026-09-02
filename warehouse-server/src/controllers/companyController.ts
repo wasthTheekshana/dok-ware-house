@@ -28,7 +28,11 @@ export const getCompanyById = async (req: Request, res: Response) => {
         const company = companyResult.rows[0];
 
         const deptResult = await execute<any>(
-            `SELECT id, name, code, status, current_box_count FROM departments WHERE company_id = :id ORDER BY name`,
+            `SELECT d.id, d.name, d.code, d.status, d.current_box_count, d.warehouse_id, w.name AS warehouse_name
+             FROM departments d
+             JOIN warehouses w ON w.id = d.warehouse_id
+             WHERE d.company_id = :id
+             ORDER BY d.name`,
             [req.params.id]
         );
         company.DEPARTMENTS = deptResult.rows;

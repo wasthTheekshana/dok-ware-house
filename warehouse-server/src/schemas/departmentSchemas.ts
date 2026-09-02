@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const createDepartmentSchema = z.object({
     company_id: z.number().int().positive(),
+    warehouse_id: z.number().int().positive(),
     name: z.string().min(1).max(200),
     code: z.string().min(1).max(32).optional(),
 });

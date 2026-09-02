@@ -21,23 +21,39 @@ const app = express();
 app.use(express.json());
 app.use('/api/departments', departmentRoutes);
 
+const VALID_BODY = { company_id: 1, warehouse_id: 1, name: 'CASH DEPT' };
+
 describe('Departments API', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
     it('POST rejects when company_id does not exist', async () => {
         mockExecute.mockResolvedValueOnce({ rows: [] }); // company check
 
-        const res = await request(app).post('/api/departments').send({ company_id: 999, name: 'CASH DEPT' });
+        const res = await request(app).post('/api/departments').send(VALID_BODY);
 
         expect(res.status).toBe(400);
+        expect(mockExecute).toHaveBeenCalledTimes(1);
     });
 
-    it('POST creates a department when company exists', async () => {
+    it('POST rejects when warehouse_id does not exist', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // company check passes
+            .mockResolvedValueOnce({ rows: [] }); // warehouse check fails
+
+        const res = await request(app).post('/api/departments').send(VALID_BODY);
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/warehouse_id/);
+        expect(mockExecute).toHaveBeenCalledTimes(2);
+    });
+
+    it('POST creates a department when company and warehouse both exist', async () => {
         mockExecute
             .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // company check
-            .mockResolvedValueOnce({ rows: [{ ID: 10, COMPANY_ID: 1, NAME: 'CASH DEPT', CURRENT_BOX_COUNT: 0 }] }); // insert
+            .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // warehouse check
+            .mockResolvedValueOnce({ rows: [{ ID: 10, COMPANY_ID: 1, WAREHOUSE_ID: 1, NAME: 'CASH DEPT', CURRENT_BOX_COUNT: 0 }] }); // insert
 
-        const res = await request(app).post('/api/departments').send({ company_id: 1, name: 'CASH DEPT' });
+        const res = await request(app).post('/api/departments').send(VALID_BODY);
 
         expect(res.status).toBe(201);
         expect(res.body.NAME).toBe('CASH DEPT');
@@ -49,7 +65,7 @@ describe('Departments API', () => {
         const res = await request(app).get('/api/departments?company_id=1');
 
         expect(res.status).toBe(200);
-        expect(mockExecute.mock.calls[0][0]).toMatch(/AND company_id = :company_id/);
+        expect(mockExecute.mock.calls[0][0]).toMatch(/AND d\.company_id = :company_id/);
     });
 
     it('POST returns 409 when duplicate name within company', async () => {
@@ -57,9 +73,10 @@ describe('Departments API', () => {
         err.code = '23505';
         mockExecute
             .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // company exists
+            .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // warehouse exists
             .mockRejectedValueOnce(err); // duplicate key on insert
 
-        const res = await request(app).post('/api/departments').send({ company_id: 1, name: 'CASH DEPT' });
+        const res = await request(app).post('/api/departments').send(VALID_BODY);
 
         expect(res.status).toBe(409);
     });
