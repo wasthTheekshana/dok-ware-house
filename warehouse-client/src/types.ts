@@ -1,9 +1,21 @@
+export type UserRole = 'system_admin' | 'warehouse_admin' | 'finance_officer';
+
+export type PermissionKey =
+    | 'manage_companies'
+    | 'manage_warehouses'
+    | 'manage_box_events'
+    | 'view_invoices'
+    | 'manage_invoices'
+    | 'manage_users';
+
 export interface WhUser {
     ID: number;
     USERNAME: string;
     NAME: string;
-    ROLE: 'admin' | 'staff';
+    ROLE: UserRole;
     STATUS: 'active' | 'inactive';
+    WAREHOUSE_IDS: number[];
+    EFFECTIVE_PERMISSIONS: PermissionKey[];
 }
 
 export interface LoginResponse {
@@ -15,9 +27,11 @@ export interface AppUser {
     ID: number;
     USERNAME: string;
     NAME: string;
-    ROLE: 'admin' | 'staff';
+    ROLE: UserRole;
     STATUS: 'active' | 'inactive';
+    WAREHOUSE_IDS: number[];
     CREATED_AT: string;
+    PERMISSION_OVERRIDES?: { PERMISSION_KEY: PermissionKey; GRANTED: boolean }[];
 }
 
 export interface Company {
