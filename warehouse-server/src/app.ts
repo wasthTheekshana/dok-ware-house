@@ -8,6 +8,7 @@ import departmentRoutes from './routes/departmentRoutes';
 import boxEventRoutes from './routes/boxEventRoutes';
 import summaryRoutes from './routes/summaryRoutes';
 import invoiceRoutes from './routes/invoiceRoutes';
+import expenseRoutes from './routes/expenseRoutes';
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/box-events', boxEventRoutes);
 app.use('/api/summary', summaryRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
