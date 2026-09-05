@@ -7,7 +7,8 @@ export type PermissionKey =
     | 'view_invoices'
     | 'manage_invoices'
     | 'manage_users'
-    | 'manage_expenses';
+    | 'manage_expenses'
+    | 'manage_staff';
 
 export interface WhUser {
     ID: number;
@@ -171,4 +172,43 @@ export interface ExpenseComparisonRow {
     WAREHOUSE_ID: number;
     WAREHOUSE_NAME: string;
     TOTAL_AMOUNT: number;
+}
+
+export interface Staff {
+    ID: number;
+    WAREHOUSE_ID: number;
+    WAREHOUSE_NAME?: string;
+    NAME: string;
+    NIC: string;
+    DESIGNATION: string | null;
+    JOIN_DATE: string;
+    BASIC_SALARY: number;
+    EPF_NO: string | null;
+    STATUS: 'active' | 'inactive';
+    CREATED_AT: string;
+}
+
+export type AttendanceStatus = 'present' | 'absent' | 'half_day' | 'leave';
+
+export interface AttendanceEntry {
+    ID: number;
+    STAFF_ID: number;
+    STAFF_NAME?: string;
+    WAREHOUSE_ID?: number;
+    ATTENDANCE_DATE: string;
+    STATUS: AttendanceStatus;
+    IN_TIME: string | null;
+    OUT_TIME: string | null;
+}
+
+export interface AttendanceSummary {
+    staff_id: number;
+    year: number;
+    month: number;
+    counts: {
+        present: number;
+        absent: number;
+        half_day: number;
+        leave: number;
+    };
 }

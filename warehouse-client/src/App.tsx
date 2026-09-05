@@ -13,6 +13,8 @@ import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
+import Staff from './pages/Staff';
+import Attendance from './pages/Attendance';
 
 const LoadingScreen = () => (
     <div className="flex items-center justify-center h-screen">
@@ -46,6 +48,8 @@ function AppRoutes() {
                     <Route path="warehouses" element={<Warehouses />} />
                     <Route path="box-events" element={<BoxEvents />} />
                     <Route path="expenses" element={<Expenses />} />
+                    <Route path="staff" element={<Staff />} />
+                    <Route path="attendance" element={<Attendance />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="users" element={<Users />} />
                     <Route path="invoices" element={<Invoices />} />
