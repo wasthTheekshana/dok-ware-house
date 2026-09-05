@@ -48,11 +48,11 @@ const Attendance: React.FC = () => {
         if (!canManageStaff) return;
         api.get<Warehouse[]>('/warehouses').then((res) => {
             setWarehouses(res.data);
-            if (isScoped) {
-                const ownWarehouses = res.data.filter((w) => selectableWarehouseIds.includes(w.ID));
-                if (ownWarehouses.length === 1) {
-                    setSelectedWarehouseId(String(ownWarehouses[0].ID));
-                }
+            const selectable = isScoped
+                ? res.data.filter((w) => selectableWarehouseIds.includes(w.ID))
+                : res.data;
+            if (selectable.length === 1) {
+                setSelectedWarehouseId(String(selectable[0].ID));
             }
         }).finally(() => setLoading(false));
     }, [canManageStaff, isScoped]);
@@ -66,6 +66,8 @@ const Attendance: React.FC = () => {
             api.get<Staff[]>('/staff', { params: { warehouse_id: selectedWarehouseId, status: 'active' } }),
             api.get<AttendanceEntry[]>('/attendance', { params: { from: attendanceDate, to: attendanceDate } }),
         ]).then(([staffRes, attendanceRes]) => {
+            setSummaryStaffId('');
+            setSummary(null);
             setStaffList(staffRes.data);
             const existingByStaffId: Record<number, AttendanceEntry> = {};
             for (const entry of attendanceRes.data) {

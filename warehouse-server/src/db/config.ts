@@ -119,11 +119,11 @@ export async function initializeDb() {
             )
         `);
 
-        // Widen the permission_key CHECK to include manage_expenses. Safe to
-        // run in any order relative to existing rows — this only ADDS an
-        // allowed value, it never removes one, so no pre-existing row can
-        // violate it (unlike the users.role migration above, which had to
-        // migrate data before tightening).
+        // Widen the permission_key CHECK to include manage_expenses and
+        // manage_staff. Safe to run in any order relative to existing rows —
+        // this only ADDS allowed values, it never removes one, so no
+        // pre-existing row can violate it (unlike the users.role migration
+        // above, which had to migrate data before tightening).
         await client.query(`
             ALTER TABLE user_permission_overrides DROP CONSTRAINT IF EXISTS user_permission_overrides_permission_key_check
         `);

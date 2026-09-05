@@ -69,11 +69,11 @@ const Expenses: React.FC = () => {
         ]).then(([warehousesRes, entriesRes]) => {
             setWarehouses(warehousesRes.data);
             setEntries(entriesRes.data);
-            if (isScoped) {
-                const ownWarehouses = warehousesRes.data.filter((w) => selectableWarehouseIds.includes(w.ID));
-                if (ownWarehouses.length === 1) {
-                    setFormWarehouseId(String(ownWarehouses[0].ID));
-                }
+            const selectable = isScoped
+                ? warehousesRes.data.filter((w) => selectableWarehouseIds.includes(w.ID))
+                : warehousesRes.data;
+            if (selectable.length === 1) {
+                setFormWarehouseId(String(selectable[0].ID));
             }
         }).finally(() => setLoading(false));
     }, [canManageExpenses, isScoped]);

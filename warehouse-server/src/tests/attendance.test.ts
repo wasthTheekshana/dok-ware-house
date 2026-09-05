@@ -158,3 +158,127 @@ describe('POST /api/attendance/bulk-mark — warehouse scoping for warehouse_adm
         jest.resetModules();
     });
 });
+
+describe('GET /api/attendance — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('scopes results to the warehouse_admin\'s warehouse_ids', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute.mockResolvedValueOnce({ rows: [] });
+            return { execute, withTransaction: jest.fn(async (fn: any) => fn(execute)) };
+        });
+
+        const scopedRoutes = require('../routes/attendanceRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/attendance', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/attendance');
+
+        expect(res.status).toBe(200);
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND s\.warehouse_id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('GET /api/attendance/summary — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('returns 404 when the staff member is outside the warehouse_admin\'s warehouse_ids', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute.mockResolvedValueOnce({ rows: [] }); // staff existence+scope check, scoped out
+            return { execute, withTransaction: jest.fn(async (fn: any) => fn(execute)) };
+        });
+
+        const scopedRoutes = require('../routes/attendanceRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/attendance', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/attendance/summary?staff_id=999&year=2026&month=9');
+
+        expect(res.status).toBe(404);
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND warehouse_id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('POST /api/attendance/bulk-mark — staff-membership check under warehouse_admin scope', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('rejects the batch when a staff_id does not belong to warehouse_id, even when warehouse_id itself is in scope', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [1] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute.mockResolvedValueOnce({ rows: [{ ID: 1 }] }); // only 1 of 2 staff_ids matched warehouse_id
+            return { execute, withTransaction: jest.fn(async (fn: any) => fn(execute)) };
+        });
+
+        const scopedRoutes = require('../routes/attendanceRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/attendance', scopedRoutes);
+
+        const res = await request(scopedApp).post('/api/attendance/bulk-mark').send({
+            warehouse_id: 1,
+            attendance_date: '2026-09-05',
+            entries: [
+                { staff_id: 1, status: 'present' },
+                { staff_id: 2, status: 'absent' },
+            ],
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/do not belong to warehouse_id/);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
