@@ -1,17 +1,33 @@
 import { Request, Response } from 'express';
 import { execute } from '../db/dbUtils';
 
+function canSeePricing(role: string): boolean {
+    return role === 'system_admin' || role === 'finance_officer';
+}
+
+function warehouseScope(req: Request): number[] | null {
+    const user = (req as any).user;
+    if (!user || user.role !== 'warehouse_admin') return null;
+    return user.warehouse_ids || [];
+}
+
 export const getCompanies = async (req: Request, res: Response) => {
     try {
-        const result = await execute<any>(`
+        const scope = warehouseScope(req);
+        let query = `
             SELECT c.id, c.name, c.code, c.contact_person, c.phone, c.email, c.address, c.status,
                    COUNT(d.id)::int AS department_count,
                    COALESCE(SUM(d.current_box_count), 0)::int AS total_box_count
             FROM companies c
             LEFT JOIN departments d ON d.company_id = c.id
-            GROUP BY c.id
-            ORDER BY c.name
-        `);
+        `;
+        const params: any = {};
+        if (scope !== null) {
+            query += ` WHERE c.id IN (SELECT company_id FROM departments WHERE warehouse_id = ANY(:warehouse_ids))`;
+            params.warehouse_ids = scope;
+        }
+        query += ` GROUP BY c.id ORDER BY c.name`;
+        const result = await execute<any>(query, params);
         res.json(result.rows);
     } catch (err) {
         console.error('getCompanies error:', err);
@@ -27,17 +43,24 @@ export const getCompanyById = async (req: Request, res: Response) => {
         }
         const company = companyResult.rows[0];
 
-        const deptResult = await execute<any>(
-            `SELECT d.id, d.name, d.code, d.status, d.current_box_count, d.warehouse_id, w.name AS warehouse_name,
+        const scope = warehouseScope(req);
+        let deptQuery = `
+            SELECT d.id, d.name, d.code, d.status, d.current_box_count, d.warehouse_id, w.name AS warehouse_name,
                     d.price_per_archived_box, d.price_per_retrieved_box, d.price_per_empty_carton
              FROM departments d
              JOIN warehouses w ON w.id = d.warehouse_id
              WHERE d.company_id = :id
-             ORDER BY d.name`,
-            [req.params.id]
-        );
-        const isAdmin = (req as any).user?.role === 'admin';
-        company.DEPARTMENTS = isAdmin
+        `;
+        const params: any = { id: req.params.id };
+        if (scope !== null) {
+            deptQuery += ` AND d.warehouse_id = ANY(:warehouse_ids)`;
+            params.warehouse_ids = scope;
+        }
+        deptQuery += ` ORDER BY d.name`;
+        const deptResult = await execute<any>(deptQuery, params);
+
+        const role = (req as any).user?.role;
+        company.DEPARTMENTS = canSeePricing(role)
             ? deptResult.rows
             : deptResult.rows.map((row: any) => {
                 const { PRICE_PER_ARCHIVED_BOX, PRICE_PER_RETRIEVED_BOX, PRICE_PER_EMPTY_CARTON, ...rest } = row;

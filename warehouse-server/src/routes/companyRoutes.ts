@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getCompanies, getCompanyById, createCompany, updateCompany } from '../controllers/companyController';
-import { authenticateToken, requireRole } from '../middleware/authMiddleware';
+import { authenticateToken } from '../middleware/authMiddleware';
+import { requirePermission } from '../middleware/permissionMiddleware';
 import { validateBody } from '../middleware/validationMiddleware';
 import { createCompanySchema, updateCompanySchema } from '../schemas/companySchemas';
 
@@ -10,7 +11,7 @@ router.use(authenticateToken);
 
 router.get('/', getCompanies);
 router.get('/:id', getCompanyById);
-router.post('/', requireRole(['admin']), validateBody(createCompanySchema), createCompany);
-router.put('/:id', requireRole(['admin']), validateBody(updateCompanySchema), updateCompany);
+router.post('/', requirePermission('manage_companies'), validateBody(createCompanySchema), createCompany);
+router.put('/:id', requirePermission('manage_companies'), validateBody(updateCompanySchema), updateCompany);
 
 export default router;

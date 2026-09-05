@@ -1,8 +1,13 @@
 import { Request, Response } from 'express';
 import { execute } from '../db/dbUtils';
 
+function canSeePricing(role: string): boolean {
+    return role === 'system_admin' || role === 'finance_officer';
+}
+
 export const getDepartments = async (req: Request, res: Response) => {
     const { company_id } = req.query;
+    const user = (req as any).user;
     try {
         let query = `
             SELECT d.id, d.company_id, d.warehouse_id, d.name, d.code, d.status, d.current_box_count,
@@ -17,10 +22,13 @@ export const getDepartments = async (req: Request, res: Response) => {
             query += ` AND d.company_id = :company_id`;
             params.company_id = company_id;
         }
+        if (user?.role === 'warehouse_admin') {
+            query += ` AND d.warehouse_id = ANY(:warehouse_ids)`;
+            params.warehouse_ids = user.warehouse_ids || [];
+        }
         query += ` ORDER BY d.name`;
         const result = await execute<any>(query, params);
-        const isAdmin = (req as any).user?.role === 'admin';
-        const rows = isAdmin
+        const rows = canSeePricing(user?.role)
             ? result.rows
             : result.rows.map((row: any) => {
                 const { PRICE_PER_ARCHIVED_BOX, PRICE_PER_RETRIEVED_BOX, PRICE_PER_EMPTY_CARTON, ...rest } = row;

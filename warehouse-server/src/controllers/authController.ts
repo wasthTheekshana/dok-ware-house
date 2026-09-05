@@ -41,7 +41,7 @@ export const login = async (req: Request, res: Response) => {
         }));
         const effectivePermissions = computeEffectivePermissions(user.ROLE, overrides);
 
-        const token = generateToken({ id: user.ID, username: user.USERNAME, role: user.ROLE });
+        const token = generateToken({ id: user.ID, username: user.USERNAME, role: user.ROLE, warehouse_ids: user.WAREHOUSE_IDS });
 
         const { PASSWORD_HASH, ...userWithoutPassword } = user;
 

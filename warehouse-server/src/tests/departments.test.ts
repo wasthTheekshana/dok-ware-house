@@ -4,10 +4,14 @@ import express, { Request, Response, NextFunction } from 'express';
 
 jest.mock('../middleware/authMiddleware', () => ({
     authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
-        (req as any).user = { id: 1, role: 'admin' };
+        (req as any).user = { id: 1, role: 'system_admin' };
         next();
     },
     requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
+}));
+
+jest.mock('../middleware/permissionMiddleware', () => ({
+    requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
@@ -112,6 +116,9 @@ describe('Departments API', () => {
             },
             requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
         }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
         jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
 
         mockExecute.mockResolvedValueOnce({
@@ -132,7 +139,43 @@ describe('Departments API', () => {
         expect(res.body[0].PRICE_PER_EMPTY_CARTON).toBeUndefined();
 
         jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
         jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('Departments API — admin-only write gating (real requirePermission)', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('POST /api/departments returns 403 for a user without manage_companies', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 1, role: 'warehouse_admin' };
+                next();
+            },
+        }));
+        jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
+        // The top-of-file jest.mock('../middleware/permissionMiddleware', ...) pass-through
+        // persists across jest.resetModules() unless explicitly overridden here — this test
+        // needs the REAL requirePermission, not the pass-through.
+        jest.doMock('../middleware/permissionMiddleware', () => jest.requireActual('../middleware/permissionMiddleware'));
+
+        mockExecute.mockResolvedValueOnce({ rows: [] }); // requirePermission's overrides lookup
+
+        const staffRoutes = require('../routes/departmentRoutes').default;
+        const staffApp = express();
+        staffApp.use(express.json());
+        staffApp.use('/api/departments', staffRoutes);
+
+        const res = await request(staffApp).post('/api/departments').send(VALID_BODY);
+
+        expect(res.status).toBe(403);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.dontMock('../middleware/permissionMiddleware');
         jest.resetModules();
     });
 });
