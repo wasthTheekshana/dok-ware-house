@@ -22,8 +22,9 @@ describe('POST /api/auth/login', () => {
     it('returns a token for valid credentials', async () => {
         const passwordHash = await bcrypt.hash('password123', 10);
         mockExecute.mockResolvedValueOnce({
-            rows: [{ ID: 1, USERNAME: 'admin', NAME: 'Administrator', ROLE: 'admin', STATUS: 'active', PASSWORD_HASH: passwordHash }],
+            rows: [{ ID: 1, USERNAME: 'admin', NAME: 'Administrator', ROLE: 'system_admin', STATUS: 'active', PASSWORD_HASH: passwordHash }],
         });
+        mockExecute.mockResolvedValueOnce({ rows: [] });
 
         const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
 
@@ -31,12 +32,13 @@ describe('POST /api/auth/login', () => {
         expect(res.body.token).toBeDefined();
         expect(res.body.user.USERNAME).toBe('admin');
         expect(res.body.user.PASSWORD_HASH).toBeUndefined();
+        expect(res.body.user.EFFECTIVE_PERMISSIONS).toContain('manage_users');
     });
 
     it('rejects wrong password', async () => {
         const passwordHash = await bcrypt.hash('password123', 10);
         mockExecute.mockResolvedValueOnce({
-            rows: [{ ID: 1, USERNAME: 'admin', ROLE: 'admin', STATUS: 'active', PASSWORD_HASH: passwordHash }],
+            rows: [{ ID: 1, USERNAME: 'admin', ROLE: 'system_admin', STATUS: 'active', PASSWORD_HASH: passwordHash }],
         });
 
         const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'wrong' });
