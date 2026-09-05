@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import type { Warehouse, Staff, AttendanceStatus, AttendanceSummary } from '../types';
+import type { Warehouse, Staff, AttendanceStatus, AttendanceSummary, AttendanceEntry } from '../types';
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
     { value: 'present', label: 'Present' },
@@ -58,20 +58,29 @@ const Attendance: React.FC = () => {
     }, [canManageStaff, isScoped]);
 
     useEffect(() => {
-        if (!selectedWarehouseId) {
+        if (!selectedWarehouseId || !attendanceDate) {
             setStaffList([]);
             return;
         }
-        api.get<Staff[]>('/staff', { params: { warehouse_id: selectedWarehouseId, status: 'active' } })
-            .then((res) => {
-                setStaffList(res.data);
-                const initial: Record<number, RowState> = {};
-                for (const s of res.data) {
-                    initial[s.ID] = { status: 'present', in_time: '', out_time: '' };
-                }
-                setRows(initial);
-            });
-    }, [selectedWarehouseId]);
+        Promise.all([
+            api.get<Staff[]>('/staff', { params: { warehouse_id: selectedWarehouseId, status: 'active' } }),
+            api.get<AttendanceEntry[]>('/attendance', { params: { from: attendanceDate, to: attendanceDate } }),
+        ]).then(([staffRes, attendanceRes]) => {
+            setStaffList(staffRes.data);
+            const existingByStaffId: Record<number, AttendanceEntry> = {};
+            for (const entry of attendanceRes.data) {
+                existingByStaffId[entry.STAFF_ID] = entry;
+            }
+            const initial: Record<number, RowState> = {};
+            for (const s of staffRes.data) {
+                const existing = existingByStaffId[s.ID];
+                initial[s.ID] = existing
+                    ? { status: existing.STATUS, in_time: existing.IN_TIME || '', out_time: existing.OUT_TIME || '' }
+                    : { status: 'present', in_time: '', out_time: '' };
+            }
+            setRows(initial);
+        });
+    }, [selectedWarehouseId, attendanceDate]);
 
     const updateRow = (staffId: number, field: keyof RowState, value: string) => {
         setRows((prev) => ({ ...prev, [staffId]: { ...prev[staffId], [field]: value } }));
