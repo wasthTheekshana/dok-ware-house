@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { LayoutDashboard, Building2, Warehouse, PackageSearch, BarChart3, Users, Receipt, LogOut, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Building2, Warehouse, PackageSearch, BarChart3, Users, Receipt, Wallet, LogOut, KeyRound } from 'lucide-react';
 
 const NAV_ITEMS = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,6 +19,7 @@ const Layout: React.FC = () => {
     const permissions = user?.EFFECTIVE_PERMISSIONS || [];
     const navItems = [
         ...NAV_ITEMS,
+        ...(permissions.includes('manage_expenses') ? [{ to: '/expenses', label: 'Expenses', icon: Wallet }] : []),
         ...(permissions.includes('manage_users') ? [{ to: '/users', label: 'Users', icon: Users }] : []),
         ...(permissions.includes('view_invoices') ? [{ to: '/invoices', label: 'Invoices', icon: Receipt }] : []),
     ];

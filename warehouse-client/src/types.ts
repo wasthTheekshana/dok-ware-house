@@ -6,7 +6,8 @@ export type PermissionKey =
     | 'manage_box_events'
     | 'view_invoices'
     | 'manage_invoices'
-    | 'manage_users';
+    | 'manage_users'
+    | 'manage_expenses';
 
 export interface WhUser {
     ID: number;
@@ -131,4 +132,43 @@ export interface MonthlySummaryRow {
     ARCHIVED: number;
     RETRIEVED: number;
     EMPTY_CARTON_ISSUED: number;
+}
+
+export interface WarehouseExpense {
+    ID: number;
+    WAREHOUSE_ID: number;
+    WAREHOUSE_NAME?: string;
+    EXPENSE_DATE: string;
+    TRANSPORT_AMOUNT: number;
+    FUEL_AMOUNT: number;
+    LABOUR_AMOUNT: number;
+    MEALS_AMOUNT: number;
+    OTHER_AMOUNT: number;
+    REMARKS: string | null;
+    CREATED_AT: string;
+    UPDATED_AT: string;
+}
+
+export interface ExpenseCategorySummary {
+    current: number;
+    variance: { value: number | null; percent: number | null };
+}
+
+export interface ExpenseSummary {
+    warehouse_id: number;
+    year: number;
+    month: number;
+    categories: {
+        transport_amount: ExpenseCategorySummary;
+        fuel_amount: ExpenseCategorySummary;
+        labour_amount: ExpenseCategorySummary;
+        meals_amount: ExpenseCategorySummary;
+        other_amount: ExpenseCategorySummary;
+    };
+}
+
+export interface ExpenseComparisonRow {
+    WAREHOUSE_ID: number;
+    WAREHOUSE_NAME: string;
+    TOTAL_AMOUNT: number;
 }
