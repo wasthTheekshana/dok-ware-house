@@ -28,3 +28,14 @@ export const expenseQuerySchema = z.object({
     from: dateStr.optional(),
     to: dateStr.optional(),
 });
+
+export const expenseSummaryQuerySchema = z.object({
+    warehouse_id: z.string().optional(),
+    year: z.string().regex(/^\d{4}$/, 'year must be a 4-digit number'),
+    month: z.string().regex(/^(0?[1-9]|1[0-2])$/, 'month must be 1-12'),
+});
+
+export const expenseComparisonQuerySchema = z.object({
+    year: z.string().regex(/^\d{4}$/, 'year must be a 4-digit number'),
+    month: z.string().regex(/^(0?[1-9]|1[0-2])$/, 'month must be 1-12'),
+});

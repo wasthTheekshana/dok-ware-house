@@ -157,6 +157,110 @@ describe('POST /api/expenses — warehouse scoping for warehouse_admin', () => {
     });
 });
 
+describe('GET /api/expenses/summary', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('computes per-category variance against the prior month', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 1500, FUEL_AMOUNT: 2000, LABOUR_AMOUNT: 500, MEALS_AMOUNT: 300, OTHER_AMOUNT: 100, ENTRY_COUNT: 20 }] }) // current month
+            .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 1000, FUEL_AMOUNT: 2000, LABOUR_AMOUNT: 500, MEALS_AMOUNT: 300, OTHER_AMOUNT: 100, ENTRY_COUNT: 18 }] }); // prior month
+
+        const res = await request(app).get('/api/expenses/summary?warehouse_id=1&year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        expect(res.body.categories.transport_amount).toEqual({ current: 1500, variance: { value: 500, percent: 50 } });
+        expect(res.body.categories.fuel_amount).toEqual({ current: 2000, variance: { value: 0, percent: 0 } });
+    });
+
+    it('returns null variance when the prior month has no entries', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 1500, FUEL_AMOUNT: 0, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0, ENTRY_COUNT: 5 }] })
+            .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 0, FUEL_AMOUNT: 0, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0, ENTRY_COUNT: 0 }] });
+
+        const res = await request(app).get('/api/expenses/summary?warehouse_id=1&year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        expect(res.body.categories.transport_amount).toEqual({ current: 1500, variance: { value: null, percent: null } });
+    });
+
+    it('queries December as the prior month when the requested month is January', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 100, FUEL_AMOUNT: 0, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0, ENTRY_COUNT: 3 }] })
+            .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 100, FUEL_AMOUNT: 0, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0, ENTRY_COUNT: 3 }] });
+
+        const res = await request(app).get('/api/expenses/summary?warehouse_id=1&year=2026&month=1');
+
+        expect(res.status).toBe(200);
+        const priorMonthParams = mockExecute.mock.calls[1][1];
+        expect(priorMonthParams).toMatchObject({ year: 2025, month: 12 });
+    });
+
+    it('returns 400 when no warehouse_id is given and the requester is unscoped', async () => {
+        const res = await request(app).get('/api/expenses/summary?year=2026&month=9');
+
+        expect(res.status).toBe(400);
+    });
+});
+
+describe('GET /api/expenses/comparison', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('returns one row per warehouse with its monthly total', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [
+            { WAREHOUSE_ID: 1, WAREHOUSE_NAME: 'Dagonna', TOTAL_AMOUNT: 5000 },
+            { WAREHOUSE_ID: 2, WAREHOUSE_NAME: 'Mt. Lavinia', TOTAL_AMOUNT: 3000 },
+        ] });
+
+        const res = await request(app).get('/api/expenses/comparison?year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(2);
+        const [query, params] = mockExecute.mock.calls[0];
+        expect(query).toMatch(/make_date\(:year::int, :month::int, 1\)/);
+        expect(params).toMatchObject({ year: 2026, month: 9 });
+    });
+});
+
+describe('GET /api/expenses/comparison — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('scopes results to the warehouse_admin\'s own warehouse', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute.mockResolvedValueOnce({ rows: [{ WAREHOUSE_ID: 2, WAREHOUSE_NAME: 'Mt. Lavinia', TOTAL_AMOUNT: 3000 }] });
+            return { execute };
+        });
+
+        const scopedRoutes = require('../routes/expenseRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/expenses', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/expenses/comparison?year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND w\.id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
 describe('GET /api/expenses — warehouse scoping for warehouse_admin', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
