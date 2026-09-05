@@ -3,7 +3,7 @@ import { wouldRemoveLastAdmin } from '../utils/adminGuard';
 
 describe('wouldRemoveLastAdmin', () => {
     it('allows any change to a user who is not currently an active admin', () => {
-        expect(wouldRemoveLastAdmin(false, 'staff', 'inactive', 0)).toBe(false);
+        expect(wouldRemoveLastAdmin(false, 'warehouse_admin', 'inactive', 0)).toBe(false);
     });
 
     it('allows a no-op update that keeps the user an active admin', () => {
@@ -11,7 +11,7 @@ describe('wouldRemoveLastAdmin', () => {
     });
 
     it('allows demoting the last active admin when another active admin exists', () => {
-        expect(wouldRemoveLastAdmin(true, 'staff', undefined, 1)).toBe(false);
+        expect(wouldRemoveLastAdmin(true, 'warehouse_admin', undefined, 1)).toBe(false);
     });
 
     it('allows deactivating the last active admin when another active admin exists', () => {
@@ -19,7 +19,7 @@ describe('wouldRemoveLastAdmin', () => {
     });
 
     it('rejects demoting the sole active admin', () => {
-        expect(wouldRemoveLastAdmin(true, 'staff', undefined, 0)).toBe(true);
+        expect(wouldRemoveLastAdmin(true, 'warehouse_admin', undefined, 0)).toBe(true);
     });
 
     it('rejects deactivating the sole active admin', () => {
@@ -27,6 +27,6 @@ describe('wouldRemoveLastAdmin', () => {
     });
 
     it('rejects both demoting and deactivating the sole active admin at once', () => {
-        expect(wouldRemoveLastAdmin(true, 'staff', 'inactive', 0)).toBe(true);
+        expect(wouldRemoveLastAdmin(true, 'warehouse_admin', 'inactive', 0)).toBe(true);
     });
 });

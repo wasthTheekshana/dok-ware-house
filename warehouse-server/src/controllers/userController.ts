@@ -7,7 +7,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
 export const getUsers = async (req: Request, res: Response) => {
     try {
         const result = await execute<any>(
-            `SELECT id, username, name, role, status, created_at FROM users ORDER BY name`
+            `SELECT id, username, name, role, status, warehouse_ids, created_at FROM users ORDER BY name`
         );
         res.json(result.rows);
     } catch (err) {
@@ -19,13 +19,19 @@ export const getUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
     try {
         const result = await execute<any>(
-            `SELECT id, username, name, role, status, created_at FROM users WHERE id = :id`,
+            `SELECT id, username, name, role, status, warehouse_ids, created_at FROM users WHERE id = :id`,
             [req.params.id]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
-        res.json(result.rows[0]);
+        const user = result.rows[0];
+        const overridesResult = await execute<any>(
+            `SELECT permission_key, granted FROM user_permission_overrides WHERE user_id = :id`,
+            [req.params.id]
+        );
+        user.PERMISSION_OVERRIDES = overridesResult.rows;
+        res.json(user);
     } catch (err) {
         console.error('getUserById error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -33,14 +39,14 @@ export const getUserById = async (req: Request, res: Response) => {
 };
 
 export const createUser = async (req: Request, res: Response) => {
-    const { username, name, password, role } = req.body;
+    const { username, name, password, role, warehouse_ids } = req.body;
     try {
         const passwordHash = await hashPassword(password);
         const result = await execute<any>(
-            `INSERT INTO users (username, password_hash, name, role)
-             VALUES (:username, :password_hash, :name, :role)
-             RETURNING id, username, name, role, status, created_at`,
-            { username, password_hash: passwordHash, name, role }
+            `INSERT INTO users (username, password_hash, name, role, warehouse_ids)
+             VALUES (:username, :password_hash, :name, :role, :warehouse_ids)
+             RETURNING id, username, name, role, status, warehouse_ids, created_at`,
+            { username, password_hash: passwordHash, name, role, warehouse_ids: warehouse_ids || [] }
         );
         res.status(201).json(result.rows[0]);
     } catch (err: any) {
@@ -52,10 +58,10 @@ export const createUser = async (req: Request, res: Response) => {
     }
 };
 
-const ALLOWED_UPDATE_FIELDS = ['name', 'role', 'status', 'password_hash'] as const;
+const ALLOWED_UPDATE_FIELDS = ['name', 'role', 'status', 'password_hash', 'warehouse_ids'] as const;
 
 export const updateUser = async (req: Request, res: Response) => {
-    const { password, ...fields } = req.body;
+    const { password, permission_overrides, ...fields } = req.body;
     try {
         const result = await withTransaction(async (exec) => {
             const existingResult = await exec<any>(`SELECT id, role, status FROM users WHERE id = :id FOR UPDATE`, [req.params.id]);
@@ -63,12 +69,12 @@ export const updateUser = async (req: Request, res: Response) => {
                 return null;
             }
             const existing = existingResult.rows[0];
-            const isCurrentlyActiveAdmin = existing.ROLE === 'admin' && existing.STATUS === 'active';
+            const isCurrentlyActiveAdmin = existing.ROLE === 'system_admin' && existing.STATUS === 'active';
 
             if (isCurrentlyActiveAdmin) {
                 const countResult = await exec<any>(
                     `WITH locked AS (
-                        SELECT id FROM users WHERE role = 'admin' AND status = 'active' AND id != :id FOR UPDATE
+                        SELECT id FROM users WHERE role = 'system_admin' AND status = 'active' AND id != :id FOR UPDATE
                     )
                     SELECT COUNT(*)::int AS count FROM locked`,
                     [req.params.id]
@@ -84,13 +90,35 @@ export const updateUser = async (req: Request, res: Response) => {
                 updateFields.password_hash = await hashPassword(password);
             }
             const keys = Object.keys(updateFields).filter(k => (ALLOWED_UPDATE_FIELDS as readonly string[]).includes(k));
-            const setClauses = keys.map(key => `${key} = :${key}`).join(', ');
 
-            const updateResult = await exec<any>(
-                `UPDATE users SET ${setClauses} WHERE id = :id RETURNING id, username, name, role, status, created_at`,
-                { ...updateFields, id: req.params.id }
-            );
-            return updateResult.rows[0];
+            let updatedUser: any = null;
+            if (keys.length > 0) {
+                const setClauses = keys.map(key => `${key} = :${key}`).join(', ');
+                const updateResult = await exec<any>(
+                    `UPDATE users SET ${setClauses} WHERE id = :id RETURNING id, username, name, role, status, warehouse_ids, created_at`,
+                    { ...updateFields, id: req.params.id }
+                );
+                updatedUser = updateResult.rows[0];
+            }
+
+            if (permission_overrides !== undefined) {
+                await exec(`DELETE FROM user_permission_overrides WHERE user_id = :user_id`, { user_id: req.params.id });
+                for (const override of permission_overrides) {
+                    await exec(
+                        `INSERT INTO user_permission_overrides (user_id, permission_key, granted) VALUES (:user_id, :permission_key, :granted)`,
+                        { user_id: req.params.id, permission_key: override.permission_key, granted: override.granted }
+                    );
+                }
+            }
+
+            if (!updatedUser) {
+                const fetchResult = await exec<any>(
+                    `SELECT id, username, name, role, status, warehouse_ids, created_at FROM users WHERE id = :id`,
+                    [req.params.id]
+                );
+                updatedUser = fetchResult.rows[0];
+            }
+            return updatedUser;
         });
 
         if (result === null) {

@@ -5,7 +5,7 @@ export function wouldRemoveLastAdmin(
     otherActiveAdminCount: number
 ): boolean {
     if (!targetIsCurrentlyActiveAdmin) return false;
-    const staysAdmin = newRole === undefined || newRole === 'admin';
+    const staysAdmin = newRole === undefined || newRole === 'system_admin';
     const staysActive = newStatus === undefined || newStatus === 'active';
     if (staysAdmin && staysActive) return false;
     return otherActiveAdminCount === 0;
