@@ -2,16 +2,27 @@ import { Request, Response } from 'express';
 import { execute, withTransaction } from '../db/dbUtils';
 import { applyBoxEvent, eventDelta, BoxEventType } from '../utils/boxCount';
 
+function warehouseScope(req: Request): number[] | null {
+    const user = (req as any).user;
+    if (!user || user.role !== 'warehouse_admin') return null;
+    return user.warehouse_ids || [];
+}
+
 export const createBoxEvent = async (req: Request, res: Response) => {
     const { department_id, event_type, quantity, event_date, reference_no, remarks } = req.body;
     const userId = (req as any).user?.id ?? null;
+    const scope = warehouseScope(req);
 
     try {
         const event = await withTransaction(async (exec) => {
-            const deptResult = await exec<any>(
-                `SELECT id, current_box_count FROM departments WHERE id = :department_id FOR UPDATE`,
-                { department_id }
-            );
+            let deptQuery = `SELECT id, current_box_count FROM departments WHERE id = :department_id`;
+            const deptParams: any = { department_id };
+            if (scope !== null) {
+                deptQuery += ` AND warehouse_id = ANY(:warehouse_ids)`;
+                deptParams.warehouse_ids = scope;
+            }
+            deptQuery += ` FOR UPDATE`;
+            const deptResult = await exec<any>(deptQuery, deptParams);
             if (deptResult.rows.length === 0) {
                 throw Object.assign(new Error('Department not found'), { statusCode: 404 });
             }
@@ -51,6 +62,7 @@ export const createBoxEvent = async (req: Request, res: Response) => {
 
 export const getBoxEvents = async (req: Request, res: Response) => {
     const { department_id, event_type, from, to } = req.query;
+    const scope = warehouseScope(req);
     try {
         let query = `
             SELECT be.id, be.department_id, be.event_type, be.quantity, be.event_date, be.reference_no, be.remarks, be.created_at,
@@ -66,6 +78,7 @@ export const getBoxEvents = async (req: Request, res: Response) => {
         if (event_type) { query += ` AND be.event_type = :event_type`; params.event_type = event_type; }
         if (from) { query += ` AND be.event_date >= :from`; params.from = from; }
         if (to) { query += ` AND be.event_date <= :to`; params.to = to; }
+        if (scope !== null) { query += ` AND d.warehouse_id = ANY(:warehouse_ids)`; params.warehouse_ids = scope; }
 
         query += ` ORDER BY be.event_date DESC, be.id DESC LIMIT 500`;
 
@@ -80,17 +93,23 @@ export const getBoxEvents = async (req: Request, res: Response) => {
 export const updateBoxEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const fields = req.body;
+    const scope = warehouseScope(req);
 
     try {
         const event = await withTransaction(async (exec) => {
-            const existingResult = await exec<any>(
-                `SELECT be.id, be.department_id, be.event_type, be.quantity, be.event_date, be.reference_no, be.remarks, d.current_box_count
-                 FROM box_events be
-                 JOIN departments d ON d.id = be.department_id
-                 WHERE be.id = :id
-                 FOR UPDATE`,
-                { id }
-            );
+            let existingQuery = `
+                SELECT be.id, be.department_id, be.event_type, be.quantity, be.event_date, be.reference_no, be.remarks, d.current_box_count
+                FROM box_events be
+                JOIN departments d ON d.id = be.department_id
+                WHERE be.id = :id
+            `;
+            const existingParams: any = { id };
+            if (scope !== null) {
+                existingQuery += ` AND d.warehouse_id = ANY(:warehouse_ids)`;
+                existingParams.warehouse_ids = scope;
+            }
+            existingQuery += ` FOR UPDATE`;
+            const existingResult = await exec<any>(existingQuery, existingParams);
             if (existingResult.rows.length === 0) {
                 throw Object.assign(new Error('Box event not found'), { statusCode: 404 });
             }
@@ -145,17 +164,23 @@ export const updateBoxEvent = async (req: Request, res: Response) => {
 
 export const deleteBoxEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
+    const scope = warehouseScope(req);
 
     try {
         await withTransaction(async (exec) => {
-            const existingResult = await exec<any>(
-                `SELECT be.id, be.department_id, be.event_type, be.quantity, d.current_box_count
-                 FROM box_events be
-                 JOIN departments d ON d.id = be.department_id
-                 WHERE be.id = :id
-                 FOR UPDATE`,
-                { id }
-            );
+            let existingQuery = `
+                SELECT be.id, be.department_id, be.event_type, be.quantity, d.current_box_count
+                FROM box_events be
+                JOIN departments d ON d.id = be.department_id
+                WHERE be.id = :id
+            `;
+            const existingParams: any = { id };
+            if (scope !== null) {
+                existingQuery += ` AND d.warehouse_id = ANY(:warehouse_ids)`;
+                existingParams.warehouse_ids = scope;
+            }
+            existingQuery += ` FOR UPDATE`;
+            const existingResult = await exec<any>(existingQuery, existingParams);
             if (existingResult.rows.length === 0) {
                 throw Object.assign(new Error('Box event not found'), { statusCode: 404 });
             }
