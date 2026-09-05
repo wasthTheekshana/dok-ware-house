@@ -220,3 +220,123 @@ describe('POST /api/box-events — warehouse scoping for warehouse_admin', () =>
         jest.resetModules();
     });
 });
+
+describe('GET /api/box-events — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('scopes results to the warehouse_admin\'s warehouse_ids', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            return { execute, withTransaction: jest.fn(async (fn: any) => fn(execute)) };
+        });
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        scopedExecute.mockResolvedValueOnce({ rows: [] });
+
+        const scopedRoutes = require('../routes/boxEventRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/box-events', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/box-events');
+
+        expect(res.status).toBe(200);
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND d\.warehouse_id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('PUT /api/box-events/:id — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('returns 404 when the event is outside the warehouse_admin\'s warehouse_ids', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            return { execute, withTransaction: jest.fn(async (fn: any) => fn(execute)) };
+        });
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        scopedExecute.mockResolvedValueOnce({ rows: [] }); // locked SELECT, scoped out
+
+        const scopedRoutes = require('../routes/boxEventRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/box-events', scopedRoutes);
+
+        const res = await request(scopedApp).put('/api/box-events/5').send({ quantity: 10 });
+
+        expect(res.status).toBe(404);
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND d\.warehouse_id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('DELETE /api/box-events/:id — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('returns 404 when the event is outside the warehouse_admin\'s warehouse_ids', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            return { execute, withTransaction: jest.fn(async (fn: any) => fn(execute)) };
+        });
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        scopedExecute.mockResolvedValueOnce({ rows: [] }); // locked SELECT, scoped out
+
+        const scopedRoutes = require('../routes/boxEventRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/box-events', scopedRoutes);
+
+        const res = await request(scopedApp).delete('/api/box-events/5');
+
+        expect(res.status).toBe(404);
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND d\.warehouse_id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});

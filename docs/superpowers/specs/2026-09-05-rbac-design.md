@@ -121,7 +121,7 @@ this app.
   `warehouse_id`), rather than requiring a permission key — these stay
   open-read for every role, just narrowed by scope.
 - `PUT /users/:id` accepts an optional `warehouse_ids: number[]` and an
-  optional `permission_overrides: {key: PermissionKey, granted: boolean}[]`
+  optional `permission_overrides: {permission_key: PermissionKey, granted: boolean}[]`
   — the latter replaces that user's full override set on each update
   (simplest semantics: the request body is the new source of truth for
   overrides, not a diff).
@@ -174,6 +174,11 @@ than a few rows.)
   own; `system_admin` gets everything regardless.
 - Frontend: `npm run build` + a manual browser pass, matching this app's
   established convention.
+
+## Known limitations
+
+- **JWT-cached `role`/`warehouse_ids` vs. fresh-per-request overrides.** `requirePermission` re-fetches a user's permission overrides from the database on every request, so revoking an override takes effect immediately. However, `role` and `warehouse_ids` are read from the JWT (set at login, 1-day expiry), not re-fetched — narrowing a `warehouse_admin`'s `warehouse_ids`, or changing anyone's `role`, does not take effect until their token expires or they log in again. A future iteration could have `requirePermission` fetch `role`/`warehouse_ids` in the same query as the overrides lookup and stamp them onto `req.user`, making the database the single source of truth end-to-end.
+- **Invoices are not warehouse-scoped.** Per this spec's own "Box events are the only fully warehouse-scoped resource in this module" decision, `GET /invoices` and invoice creation/deletion are gated by `view_invoices`/`manage_invoices` but not filtered by warehouse. This means a `warehouse_admin` granted an invoice permission via a per-user override (the exact mechanism this module introduces) sees and can act on invoices for every warehouse, not just their own. This is consistent with the letter of this spec but is a gap worth closing in a future iteration if that override is ever used in practice for a `warehouse_admin`.
 
 ## Out of scope (future modules)
 

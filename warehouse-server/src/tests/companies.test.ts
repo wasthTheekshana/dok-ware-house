@@ -87,7 +87,7 @@ describe('Companies API', () => {
         jest.resetModules();
         jest.doMock('../middleware/authMiddleware', () => ({
             authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
-                (req as any).user = { id: 1, role: 'staff' };
+                (req as any).user = { id: 1, role: 'warehouse_admin' };
                 next();
             },
             requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
@@ -115,6 +115,39 @@ describe('Companies API', () => {
         expect(res.body.DEPARTMENTS[0].PRICE_PER_ARCHIVED_BOX).toBeUndefined();
         expect(res.body.DEPARTMENTS[0].PRICE_PER_RETRIEVED_BOX).toBeUndefined();
         expect(res.body.DEPARTMENTS[0].PRICE_PER_EMPTY_CARTON).toBeUndefined();
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+
+    it('GET /api/companies/:id returns 404 for a warehouse_admin with zero departments in scope', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 1, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+            requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
+
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, NAME: 'AB Securitas' }] }) // company lookup
+            .mockResolvedValueOnce({ rows: [] }); // scoped department lookup — nothing in scope
+
+        const scopedRoutes = require('../routes/companyRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/companies', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/companies/1');
+
+        expect(res.status).toBe(404);
 
         jest.dontMock('../middleware/authMiddleware');
         jest.dontMock('../middleware/permissionMiddleware');

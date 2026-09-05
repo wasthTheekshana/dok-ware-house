@@ -13,7 +13,7 @@ async function seed() {
         const passwordHash = await hashPassword('password123');
         await pool.query(
             `INSERT INTO users (username, password_hash, name, role) VALUES ($1, $2, $3, $4)`,
-            ['admin', passwordHash, 'Administrator', 'admin']
+            ['admin', passwordHash, 'Administrator', 'system_admin']
         );
         console.log('Seeded admin user: admin / password123');
     } else {

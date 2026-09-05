@@ -39,6 +39,7 @@ const BoxEvents: React.FC = () => {
     };
 
     useEffect(() => {
+        if (!canManageBoxEvents) return;
         Promise.all([
             api.get<Company[]>('/companies'),
             api.get<BoxEvent[]>('/box-events'),
@@ -46,7 +47,7 @@ const BoxEvents: React.FC = () => {
             setCompanies(companiesRes.data);
             setEvents(eventsRes.data);
         }).finally(() => setLoading(false));
-    }, []);
+    }, [canManageBoxEvents]);
 
     const loadDepartments = (forCompanyId: string) => {
         if (!forCompanyId) {
@@ -125,6 +126,7 @@ const BoxEvents: React.FC = () => {
         }
     };
 
+    if (!canManageBoxEvents) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
 
     return (

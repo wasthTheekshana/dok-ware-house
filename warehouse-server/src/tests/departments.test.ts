@@ -111,7 +111,7 @@ describe('Departments API', () => {
         jest.resetModules();
         jest.doMock('../middleware/authMiddleware', () => ({
             authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
-                (req as any).user = { id: 1, role: 'staff' };
+                (req as any).user = { id: 1, role: 'warehouse_admin' };
                 next();
             },
             requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),

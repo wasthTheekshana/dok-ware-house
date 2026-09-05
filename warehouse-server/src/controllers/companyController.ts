@@ -59,6 +59,10 @@ export const getCompanyById = async (req: Request, res: Response) => {
         deptQuery += ` ORDER BY d.name`;
         const deptResult = await execute<any>(deptQuery, params);
 
+        if (scope !== null && deptResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Company not found' });
+        }
+
         const role = (req as any).user?.role;
         company.DEPARTMENTS = canSeePricing(role)
             ? deptResult.rows

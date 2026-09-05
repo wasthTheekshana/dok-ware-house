@@ -23,11 +23,11 @@ type OverrideState = 'default' | 'allow' | 'deny';
 
 const Users: React.FC = () => {
     const { user } = useAuth();
-    const isAdmin = user?.EFFECTIVE_PERMISSIONS?.includes('manage_users') ?? false;
+    const canManageUsers = user?.EFFECTIVE_PERMISSIONS?.includes('manage_users') ?? false;
 
     const [users, setUsers] = useState<AppUser[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-    const [loading, setLoading] = useState(isAdmin);
+    const [loading, setLoading] = useState(canManageUsers);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [username, setUsername] = useState('');
     const [name, setName] = useState('');
@@ -57,8 +57,8 @@ const Users: React.FC = () => {
     };
 
     useEffect(() => {
-        if (isAdmin) load();
-    }, [isAdmin]);
+        if (canManageUsers) load();
+    }, [canManageUsers]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -125,7 +125,7 @@ const Users: React.FC = () => {
         }
     };
 
-    if (!isAdmin) return <div className="text-slate-500">You don't have access to this page.</div>;
+    if (!canManageUsers) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
 
     return (
