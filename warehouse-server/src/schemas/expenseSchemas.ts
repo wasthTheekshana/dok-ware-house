@@ -24,13 +24,13 @@ export const updateExpenseSchema = z.object({
 }).refine(data => Object.keys(data).length > 0, { message: 'At least one field required' });
 
 export const expenseQuerySchema = z.object({
-    warehouse_id: z.string().optional(),
+    warehouse_id: z.string().regex(/^\d+$/, 'warehouse_id must be numeric').optional(),
     from: dateStr.optional(),
     to: dateStr.optional(),
 });
 
 export const expenseSummaryQuerySchema = z.object({
-    warehouse_id: z.string().optional(),
+    warehouse_id: z.string().regex(/^\d+$/, 'warehouse_id must be numeric').optional(),
     year: z.string().regex(/^\d{4}$/, 'year must be a 4-digit number'),
     month: z.string().regex(/^(0?[1-9]|1[0-2])$/, 'month must be 1-12'),
 });

@@ -22,9 +22,18 @@ function todayISO(): string {
 const Expenses: React.FC = () => {
     const { user } = useAuth();
     const canManageExpenses = user?.EFFECTIVE_PERMISSIONS?.includes('manage_expenses') ?? false;
-    const isSystemAdmin = user?.ROLE === 'system_admin';
+    // Scoped to a specific warehouse (or set of warehouses) rather than able
+    // to act across all of them. Only warehouse_admin is scoped by role
+    // default — system_admin and any finance_officer granted manage_expenses
+    // via a permission override are both backend-unscoped, so both must see
+    // the full warehouse picker and the cross-warehouse comparison view.
+    const isScoped = user?.ROLE === 'warehouse_admin';
+    const selectableWarehouseIds = user?.WAREHOUSE_IDS ?? [];
 
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const selectableWarehouses = isScoped
+        ? warehouses.filter((w) => selectableWarehouseIds.includes(w.ID))
+        : warehouses;
     const [entries, setEntries] = useState<WarehouseExpense[]>([]);
     const [loading, setLoading] = useState(canManageExpenses);
 
@@ -60,11 +69,14 @@ const Expenses: React.FC = () => {
         ]).then(([warehousesRes, entriesRes]) => {
             setWarehouses(warehousesRes.data);
             setEntries(entriesRes.data);
-            if (!isSystemAdmin && warehousesRes.data.length === 1) {
-                setFormWarehouseId(String(warehousesRes.data[0].ID));
+            if (isScoped) {
+                const ownWarehouses = warehousesRes.data.filter((w) => selectableWarehouseIds.includes(w.ID));
+                if (ownWarehouses.length === 1) {
+                    setFormWarehouseId(String(ownWarehouses[0].ID));
+                }
             }
         }).finally(() => setLoading(false));
-    }, [canManageExpenses, isSystemAdmin]);
+    }, [canManageExpenses, isScoped]);
 
     // Pre-fill (and switch to edit mode) when a same-day entry already exists
     // for the selected warehouse — matches UC-5's "pre-filled... enters
@@ -104,15 +116,15 @@ const Expenses: React.FC = () => {
     }, [formWarehouseId, summaryYear, summaryMonth]);
 
     useEffect(() => {
-        if (!isSystemAdmin) return;
+        if (isScoped) return;
         api.get<ExpenseComparisonRow[]>('/expenses/comparison', { params: { year: summaryYear, month: summaryMonth } })
             .then((res) => setComparison(res.data));
-    }, [isSystemAdmin, summaryYear, summaryMonth]);
+    }, [isScoped, summaryYear, summaryMonth]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
-        const payload: any = { remarks: formRemarks || undefined };
+        const payload: any = { remarks: formRemarks };
         for (const { key } of CATEGORY_FIELDS) {
             payload[key] = formAmounts[key] ? Number(formAmounts[key]) : 0;
         }
@@ -148,7 +160,7 @@ const Expenses: React.FC = () => {
     const cancelEdit = () => setEditingId(null);
 
     const saveEdit = async (id: number) => {
-        const payload: any = { remarks: editRemarks || undefined };
+        const payload: any = { remarks: editRemarks };
         for (const { key } of CATEGORY_FIELDS) {
             payload[key] = editAmounts[key] ? Number(editAmounts[key]) : 0;
         }
@@ -171,12 +183,12 @@ const Expenses: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                    {isSystemAdmin && (
+                    {selectableWarehouses.length > 1 && (
                         <div>
                             <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
                             <select className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formWarehouseId} onChange={(e) => setFormWarehouseId(e.target.value)} required>
                                 <option value="">Select...</option>
-                                {warehouses.map((w) => (
+                                {selectableWarehouses.map((w) => (
                                     <option key={w.ID} value={w.ID}>{w.NAME}</option>
                                 ))}
                             </select>
@@ -248,7 +260,7 @@ const Expenses: React.FC = () => {
                 </div>
             )}
 
-            {isSystemAdmin && comparison.length > 0 && (
+            {!isScoped && comparison.length > 0 && (
                 <div className="bg-white rounded-xl border border-slate-200 p-4">
                     <h2 className="text-sm font-semibold text-slate-700 mb-3">Cross-Warehouse Comparison</h2>
                     <table className="w-full text-sm">
@@ -275,7 +287,7 @@ const Expenses: React.FC = () => {
                     <thead className="text-left text-slate-500">
                         <tr>
                             <th className="p-3">Date</th>
-                            {isSystemAdmin && <th className="p-3">Warehouse</th>}
+                            {!isScoped && <th className="p-3">Warehouse</th>}
                             {CATEGORY_FIELDS.map(({ key, label }) => (
                                 <th key={key} className="p-3">{label}</th>
                             ))}
@@ -288,7 +300,7 @@ const Expenses: React.FC = () => {
                             editingId === entry.ID ? (
                                 <tr key={entry.ID} className="border-t border-slate-100 bg-slate-50">
                                     <td className="p-3">{entry.EXPENSE_DATE}</td>
-                                    {isSystemAdmin && <td className="p-3">{entry.WAREHOUSE_NAME}</td>}
+                                    {!isScoped && <td className="p-3">{entry.WAREHOUSE_NAME}</td>}
                                     {CATEGORY_FIELDS.map(({ key }) => (
                                         <td key={key} className="p-2">
                                             <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editAmounts[key]} onChange={(e) => setEditAmounts((prev) => ({ ...prev, [key]: e.target.value }))} />
@@ -307,7 +319,7 @@ const Expenses: React.FC = () => {
                             ) : (
                                 <tr key={entry.ID} className="border-t border-slate-100">
                                     <td className="p-3">{entry.EXPENSE_DATE}</td>
-                                    {isSystemAdmin && <td className="p-3">{entry.WAREHOUSE_NAME}</td>}
+                                    {!isScoped && <td className="p-3">{entry.WAREHOUSE_NAME}</td>}
                                     <td className="p-3">{entry.TRANSPORT_AMOUNT.toFixed(2)}</td>
                                     <td className="p-3">{entry.FUEL_AMOUNT.toFixed(2)}</td>
                                     <td className="p-3">{entry.LABOUR_AMOUNT.toFixed(2)}</td>

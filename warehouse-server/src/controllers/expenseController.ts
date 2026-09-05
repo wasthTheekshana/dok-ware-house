@@ -154,7 +154,9 @@ export const getExpenseSummary = async (req: Request, res: Response) => {
     let warehouseId: number | null = req.query.warehouse_id ? Number(req.query.warehouse_id) : null;
 
     if (scope !== null) {
-        warehouseId = scope[0] ?? null;
+        if (warehouseId === null || !scope.includes(warehouseId)) {
+            warehouseId = scope[0] ?? null;
+        }
     }
     if (!warehouseId) {
         return res.status(400).json({ message: 'warehouse_id is required' });

@@ -245,6 +245,45 @@ describe('GET /api/expenses/summary — warehouse scoping for warehouse_admin', 
         jest.dontMock('../db/dbUtils');
         jest.resetModules();
     });
+
+    it('honors a requested warehouse_id that is within the warehouse_admin\'s own scope', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2, 5] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute
+                .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 1500, FUEL_AMOUNT: 2000, LABOUR_AMOUNT: 500, MEALS_AMOUNT: 300, OTHER_AMOUNT: 100, ENTRY_COUNT: 20 }] }) // current month
+                .mockResolvedValueOnce({ rows: [{ TRANSPORT_AMOUNT: 1000, FUEL_AMOUNT: 2000, LABOUR_AMOUNT: 500, MEALS_AMOUNT: 300, OTHER_AMOUNT: 100, ENTRY_COUNT: 18 }] }); // prior month
+            return { execute };
+        });
+
+        const scopedRoutes = require('../routes/expenseRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/expenses', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/expenses/summary?warehouse_id=5&year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        expect(res.body.warehouse_id).toBe(5);
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        const [currentQuery, currentParams] = scopedExecute.mock.calls[0];
+        expect(currentQuery).toMatch(/WHERE warehouse_id = :warehouse_id/);
+        expect(currentParams).toMatchObject({ warehouse_id: 5 });
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
 });
 
 describe('GET /api/expenses/comparison', () => {
