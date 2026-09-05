@@ -4,11 +4,13 @@ import express, { Request, Response, NextFunction } from 'express';
 
 jest.mock('../middleware/authMiddleware', () => ({
     authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
-        (req as any).user = { id: 1, role: 'admin' };
+        (req as any).user = { id: 1, role: 'system_admin' };
         next();
     },
     requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
+
+jest.mock('../middleware/permissionMiddleware', () => ({ requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next() }));
 
 jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
 
@@ -140,33 +142,35 @@ describe('DELETE /api/invoices/:id', () => {
     });
 });
 
-describe('Invoices API — admin-only gating on every route including reads (real requireRole)', () => {
-    const { requireRole: realRequireRole } = jest.requireActual('../middleware/authMiddleware');
-
+describe('Invoices API — requirePermission(view_invoices) on GET (real requirePermission)', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
-    it('GET /api/invoices returns 403 for a non-admin user', async () => {
+    it('GET /api/invoices returns 403 when user lacks view_invoices', async () => {
         jest.resetModules();
         jest.doMock('../middleware/authMiddleware', () => ({
             authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
-                (req as any).user = { id: 1, role: 'staff' };
+                (req as any).user = { id: 1, role: 'warehouse_admin' };
                 next();
             },
-            requireRole: realRequireRole,
+            requireRole: (_roles: string[]) => (_req: Request, _res: Response, next: NextFunction) => next(),
         }));
+        jest.doMock('../middleware/permissionMiddleware', () => jest.requireActual('../middleware/permissionMiddleware'));
         jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
 
-        const staffRoutes = require('../routes/invoiceRoutes').default;
-        const staffApp = express();
-        staffApp.use(express.json());
-        staffApp.use('/api/invoices', staffRoutes);
+        mockExecute.mockResolvedValueOnce({ rows: [] }); // no permission overrides
 
-        const res = await request(staffApp).get('/api/invoices');
+        const testRoutes = require('../routes/invoiceRoutes').default;
+        const testApp = express();
+        testApp.use(express.json());
+        testApp.use('/api/invoices', testRoutes);
+
+        const res = await request(testApp).get('/api/invoices');
 
         expect(res.status).toBe(403);
-        expect(mockExecute).not.toHaveBeenCalled();
+        expect(mockExecute).toHaveBeenCalled();
 
         jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
         jest.dontMock('../db/dbUtils');
         jest.resetModules();
     });
