@@ -31,7 +31,15 @@ npm run seed            # creates schema + admin/password123
 npm run dev              # http://localhost:5100
 ```
 
-> **Note:** Schema changes in this app go directly into `CREATE TABLE IF NOT EXISTS` statements (no migrations yet, since there's no production deployment). If you have an existing `dok_warehouse` database from before the Warehouses module was added, `DROP` it and let `npm run seed` recreate it fresh — an old database will NOT automatically gain the new `warehouses` table or `departments.warehouse_id` column, and department-related endpoints will fail with a "column does not exist" error until you do.
+> **Note:** This app has no migration runner — schema is applied every time the
+> server boots (`initializeDb()` in `src/db/config.ts`). New tables use
+> `CREATE TABLE IF NOT EXISTS`, which is safe on both fresh and existing
+> databases. Adding a column to an *existing* table needs its own
+> `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` alongside the `CREATE TABLE` text
+> (the Invoicing module's department pricing columns are the current example) —
+> both are idempotent, so simply restarting the server (`npm run dev`) against
+> an older database picks up new tables and new columns automatically. No
+> `DROP`/reseed needed for schema changes going forward.
 
 ### 3. Frontend
 
@@ -41,14 +49,24 @@ npm install
 npm run dev              # http://localhost:5175
 ```
 
+## Default login
+
+`admin` / `password123` (created by `npm run seed`).
+
 ## Docs
 
 - `docs/superpowers/specs/2026-08-24-warehouse-customer-box-inventory-design.md` — Module 1: Customers & Box Inventory
 - `docs/superpowers/specs/2026-09-01-warehouses-design.md` — Module 2: Warehouses (physical locations)
-- `docs/superpowers/plans/2026-08-24-warehouse-customer-box-inventory.md` — Module 1 implementation plan
+- `docs/superpowers/specs/2026-09-02-user-management-design.md` — Module 3: User Management
+- `docs/superpowers/specs/2026-09-02-invoicing-design.md` — Module 4: Invoicing
+- `docs/superpowers/plans/` — matching implementation plan for each module above
 
 ## Roadmap
 
-Module 1 (Customers & Box Inventory) is complete, including event
-edit/delete/history. Module 2 (Warehouses) is in design. Planned next:
-user management, invoicing/billing, warehouse daily expense report.
+Complete: Module 1 (Customers & Box Inventory, including event
+edit/delete/history), Module 2 (Warehouses), Module 3 (User Management,
+including the last-active-admin guard and self-service password change),
+Module 4 (Invoicing — flat per-department pricing, preview/save,
+SSCL + VAT). Planned next: warehouse daily expense report (tracked per
+physical warehouse location, not per customer — see the source Excel
+workbook this app is replacing).
