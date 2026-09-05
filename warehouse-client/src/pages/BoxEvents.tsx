@@ -13,7 +13,7 @@ const EVENT_TYPES: { value: BoxEventType; label: string }[] = [
 
 const BoxEvents: React.FC = () => {
     const { user } = useAuth();
-    const isAdmin = user?.ROLE === 'admin';
+    const canManageBoxEvents = user?.EFFECTIVE_PERMISSIONS?.includes('manage_box_events') ?? false;
 
     const [companies, setCompanies] = useState<Company[]>([]);
     const [events, setEvents] = useState<BoxEvent[]>([]);
@@ -187,7 +187,7 @@ const BoxEvents: React.FC = () => {
                             <th className="p-3">Type</th>
                             <th className="p-3">Qty</th>
                             <th className="p-3">Reference</th>
-                            {isAdmin && <th className="p-3">Actions</th>}
+                            {canManageBoxEvents && <th className="p-3">Actions</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -227,7 +227,7 @@ const BoxEvents: React.FC = () => {
                                     <td className="p-3 capitalize">{e.EVENT_TYPE.replace('_', ' ')}</td>
                                     <td className="p-3">{e.QUANTITY}</td>
                                     <td className="p-3">{e.REFERENCE_NO}</td>
-                                    {isAdmin && (
+                                    {canManageBoxEvents && (
                                         <td className="p-3">
                                             <div className="flex gap-2">
                                                 <button onClick={() => startEdit(e)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>

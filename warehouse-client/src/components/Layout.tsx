@@ -13,16 +13,15 @@ const NAV_ITEMS = [
     { to: '/reports', label: 'Reports', icon: BarChart3 },
 ];
 
-const ADMIN_NAV_ITEMS = [
-    { to: '/users', label: 'Users', icon: Users },
-    { to: '/invoices', label: 'Invoices', icon: Receipt },
-];
-
 const Layout: React.FC = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const isAdmin = user?.ROLE === 'admin';
-    const navItems = isAdmin ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS;
+    const permissions = user?.EFFECTIVE_PERMISSIONS || [];
+    const navItems = [
+        ...NAV_ITEMS,
+        ...(permissions.includes('manage_users') ? [{ to: '/users', label: 'Users', icon: Users }] : []),
+        ...(permissions.includes('view_invoices') ? [{ to: '/invoices', label: 'Invoices', icon: Receipt }] : []),
+    ];
 
     const [showChangePassword, setShowChangePassword] = useState(false);
     const [currentPassword, setCurrentPassword] = useState('');

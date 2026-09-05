@@ -6,12 +6,13 @@ import type { Company, Department, Invoice, InvoiceBreakdown } from '../types';
 
 const Invoices: React.FC = () => {
     const { user } = useAuth();
-    const isAdmin = user?.ROLE === 'admin';
+    const canViewInvoices = user?.EFFECTIVE_PERMISSIONS?.includes('view_invoices') ?? false;
+    const canManageInvoices = user?.EFFECTIVE_PERMISSIONS?.includes('manage_invoices') ?? false;
 
     const [companies, setCompanies] = useState<Company[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [loading, setLoading] = useState(isAdmin);
+    const [loading, setLoading] = useState(canViewInvoices);
 
     const [companyId, setCompanyId] = useState('');
     const [departmentId, setDepartmentId] = useState('');
@@ -26,7 +27,7 @@ const Invoices: React.FC = () => {
     };
 
     useEffect(() => {
-        if (!isAdmin) return;
+        if (!canViewInvoices) return;
         Promise.all([
             api.get<Company[]>('/companies'),
             api.get<Invoice[]>('/invoices'),
@@ -34,7 +35,7 @@ const Invoices: React.FC = () => {
             setCompanies(companiesRes.data);
             setInvoices(invoicesRes.data);
         }).finally(() => setLoading(false));
-    }, [isAdmin]);
+    }, [canViewInvoices]);
 
     const loadDepartments = (forCompanyId: string) => {
         if (!forCompanyId) {
@@ -95,7 +96,7 @@ const Invoices: React.FC = () => {
         }
     };
 
-    if (!isAdmin) return <div className="text-slate-500">You don't have access to this page.</div>;
+    if (!canViewInvoices) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
 
     return (
@@ -131,7 +132,7 @@ const Invoices: React.FC = () => {
                 </div>
                 <button
                     onClick={handlePreview}
-                    disabled={!departmentId || !periodFrom || !periodTo || previewing}
+                    disabled={!canManageInvoices || !departmentId || !periodFrom || !periodTo || previewing}
                     className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
                     {previewing ? 'Loading...' : 'Preview'}
@@ -206,7 +207,9 @@ const Invoices: React.FC = () => {
                                 <td className="p-3">{inv.TOTAL_AMOUNT}</td>
                                 <td className="p-3">{inv.CREATED_AT}</td>
                                 <td className="p-3">
-                                    <button onClick={() => handleDelete(inv.ID)} className="text-red-600 hover:text-red-700 text-xs font-medium">Delete</button>
+                                    {canManageInvoices && (
+                                        <button onClick={() => handleDelete(inv.ID)} className="text-red-600 hover:text-red-700 text-xs font-medium">Delete</button>
+                                    )}
                                 </td>
                             </tr>
                         ))}

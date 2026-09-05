@@ -6,7 +6,7 @@ import type { Warehouse } from '../types';
 
 const Warehouses: React.FC = () => {
     const { user } = useAuth();
-    const isAdmin = user?.ROLE === 'admin';
+    const canManageWarehouses = user?.EFFECTIVE_PERMISSIONS?.includes('manage_warehouses') ?? false;
 
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ const Warehouses: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-800">Warehouses</h1>
-                {isAdmin && (
+                {canManageWarehouses && (
                     <button
                         onClick={() => setShowForm(!showForm)}
                         className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700"
