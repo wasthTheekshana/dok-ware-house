@@ -5,7 +5,8 @@ export type PermissionKey =
     | 'view_invoices'
     | 'manage_invoices'
     | 'manage_users'
-    | 'manage_expenses';
+    | 'manage_expenses'
+    | 'manage_staff';
 
 export const ALL_PERMISSION_KEYS: PermissionKey[] = [
     'manage_companies',
@@ -15,14 +16,15 @@ export const ALL_PERMISSION_KEYS: PermissionKey[] = [
     'manage_invoices',
     'manage_users',
     'manage_expenses',
+    'manage_staff',
 ];
 
 const ROLE_DEFAULTS: Record<string, PermissionKey[]> = {
     system_admin: [
         'manage_companies', 'manage_warehouses', 'manage_box_events',
-        'view_invoices', 'manage_invoices', 'manage_users', 'manage_expenses',
+        'view_invoices', 'manage_invoices', 'manage_users', 'manage_expenses', 'manage_staff',
     ],
-    warehouse_admin: ['manage_box_events', 'manage_expenses'],
+    warehouse_admin: ['manage_box_events', 'manage_expenses', 'manage_staff'],
     finance_officer: ['view_invoices', 'manage_invoices'],
 };
 
