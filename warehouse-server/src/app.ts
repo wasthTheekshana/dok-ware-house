@@ -11,6 +11,7 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import staffRoutes from './routes/staffRoutes';
 import attendanceRoutes from './routes/attendanceRoutes';
+import payrollRoutes from './routes/payrollRoutes';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/payroll', payrollRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
