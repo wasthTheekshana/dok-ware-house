@@ -294,8 +294,21 @@ export async function initializeDb() {
                 total_amount              NUMERIC(14,2) NOT NULL,
                 created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
                 created_by                INTEGER REFERENCES users(id),
-                UNIQUE (department_id, period_from, period_to)
+                reverses_invoice_id       INTEGER REFERENCES invoices(id)
             )
+        `);
+
+        await client.query(`
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reverses_invoice_id INTEGER REFERENCES invoices(id)
+        `);
+
+        await client.query(`
+            ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_department_id_period_from_period_to_key
+        `);
+
+        await client.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_unique_original
+                ON invoices(department_id, period_from, period_to) WHERE reverses_invoice_id IS NULL
         `);
 
         await client.query(`

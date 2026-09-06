@@ -106,6 +106,7 @@ export interface Invoice extends InvoiceBreakdown {
     ID: number;
     CREATED_AT: string;
     CREATED_BY: number | null;
+    REVERSES_INVOICE_ID: number | null;
 }
 
 export type BoxEventType = 'archived' | 'retrieved' | 'empty_carton_issued';

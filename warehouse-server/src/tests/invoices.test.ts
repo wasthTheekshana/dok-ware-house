@@ -122,23 +122,66 @@ describe('GET /api/invoices', () => {
     });
 });
 
-describe('DELETE /api/invoices/:id', () => {
+describe('POST /api/invoices/:id/reverse', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
-    it('deletes an invoice', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1 }] });
+    const ORIGINAL_ROW = {
+        ID: 1, DEPARTMENT_ID: 1, COMPANY_ID: 1, DEPARTMENT_NAME: 'CASH DEPT', COMPANY_NAME: 'AB Securitas',
+        PERIOD_FROM: '2026-07-01', PERIOD_TO: '2026-07-31',
+        ARCHIVED_COUNT: 100, RETRIEVED_COUNT: 20, EMPTY_CARTON_COUNT: 5,
+        PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20,
+        SUBTOTAL: 5900, SSCL_AMOUNT: 151.28, VAT_AMOUNT: 1089.87, TOTAL_AMOUNT: 7141.15,
+        REVERSES_INVOICE_ID: null,
+    };
 
-        const res = await request(app).delete('/api/invoices/1');
+    it('creates a negated mirror row linked to the original', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [ORIGINAL_ROW] })
+            .mockResolvedValueOnce({ rows: [{ ID: 2, REVERSES_INVOICE_ID: 1 }] });
 
-        expect(res.status).toBe(200);
+        const res = await request(app).post('/api/invoices/1/reverse');
+
+        expect(res.status).toBe(201);
+        const insertCall = mockExecute.mock.calls[1];
+        expect(insertCall[0]).toMatch(/INSERT INTO invoices/);
+        expect(insertCall[1].archived_count).toBe(-100);
+        expect(insertCall[1].retrieved_count).toBe(-20);
+        expect(insertCall[1].empty_carton_count).toBe(-5);
+        expect(insertCall[1].subtotal).toBe(-5900);
+        expect(insertCall[1].sscl_amount).toBe(-151.28);
+        expect(insertCall[1].vat_amount).toBe(-1089.87);
+        expect(insertCall[1].total_amount).toBe(-7141.15);
+        expect(insertCall[1].reverses_invoice_id).toBe(1);
+        expect(insertCall[1].period_from).toBe('2026-07-01');
+        expect(insertCall[1].period_to).toBe('2026-07-31');
     });
 
-    it('returns 404 when missing', async () => {
+    it('returns 400 when the invoice does not exist', async () => {
         mockExecute.mockResolvedValueOnce({ rows: [] });
 
-        const res = await request(app).delete('/api/invoices/999');
+        const res = await request(app).post('/api/invoices/999/reverse');
 
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when attempting to reverse an already-reversed invoice (a reversal row)', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] }); // WHERE reverses_invoice_id IS NULL excludes it
+
+        const res = await request(app).post('/api/invoices/2/reverse');
+
+        expect(res.status).toBe(400);
+    });
+
+    it('returns 409 when the reversal collides with an existing one', async () => {
+        const err: any = new Error('Duplicate key');
+        err.code = '23505';
+        mockExecute
+            .mockResolvedValueOnce({ rows: [ORIGINAL_ROW] })
+            .mockRejectedValueOnce(err);
+
+        const res = await request(app).post('/api/invoices/1/reverse');
+
+        expect(res.status).toBe(409);
     });
 });
 

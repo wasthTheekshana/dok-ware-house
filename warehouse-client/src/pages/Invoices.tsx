@@ -85,16 +85,20 @@ const Invoices: React.FC = () => {
         }
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('Delete this invoice?')) return;
+    const handleReverse = async (id: number) => {
+        if (!window.confirm('Reverse this invoice? This will create a negative correcting entry.')) return;
         try {
-            await api.delete(`/invoices/${id}`);
-            toast.success('Invoice deleted');
+            await api.post(`/invoices/${id}/reverse`);
+            toast.success('Invoice reversed');
             loadInvoices();
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Failed to delete invoice');
+            toast.error(err?.response?.data?.message || 'Failed to reverse invoice');
         }
     };
+
+    const reversedOriginalIds = new Set(
+        invoices.filter((inv) => inv.REVERSES_INVOICE_ID !== null).map((inv) => inv.REVERSES_INVOICE_ID)
+    );
 
     if (!canViewInvoices) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
@@ -207,8 +211,11 @@ const Invoices: React.FC = () => {
                                 <td className="p-3">{inv.TOTAL_AMOUNT}</td>
                                 <td className="p-3">{inv.CREATED_AT}</td>
                                 <td className="p-3">
-                                    {canManageInvoices && (
-                                        <button onClick={() => handleDelete(inv.ID)} className="text-red-600 hover:text-red-700 text-xs font-medium">Delete</button>
+                                    {canManageInvoices && inv.REVERSES_INVOICE_ID === null && !reversedOriginalIds.has(inv.ID) && (
+                                        <button onClick={() => handleReverse(inv.ID)} className="text-red-600 hover:text-red-700 text-xs font-medium">Reverse</button>
+                                    )}
+                                    {inv.REVERSES_INVOICE_ID !== null && (
+                                        <span className="text-slate-400 text-xs italic">Reversal of #{inv.REVERSES_INVOICE_ID}</span>
                                     )}
                                 </td>
                             </tr>

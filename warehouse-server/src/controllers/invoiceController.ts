@@ -150,15 +150,58 @@ export const getInvoices = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteInvoice = async (req: Request, res: Response) => {
+export const reverseInvoice = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = (req as any).user?.id ?? null;
     try {
-        const result = await execute<any>(`DELETE FROM invoices WHERE id = :id RETURNING id`, [req.params.id]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Invoice not found' });
+        const originalResult = await execute<any>(
+            `SELECT * FROM invoices WHERE id = :id AND reverses_invoice_id IS NULL`,
+            { id }
+        );
+        if (originalResult.rows.length === 0) {
+            return res.status(400).json({ message: 'Only a non-reversal invoice can be reversed' });
         }
-        res.json({ message: 'Invoice deleted' });
-    } catch (err) {
-        console.error('deleteInvoice error:', err);
+        const original = originalResult.rows[0];
+
+        const result = await execute<any>(
+            `INSERT INTO invoices (
+                department_id, company_id, department_name, company_name,
+                period_from, period_to, archived_count, retrieved_count, empty_carton_count,
+                price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
+                subtotal, sscl_amount, vat_amount, total_amount, created_by, reverses_invoice_id
+            ) VALUES (
+                :department_id, :company_id, :department_name, :company_name,
+                :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
+                :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
+                :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by, :reverses_invoice_id
+            ) RETURNING *`,
+            {
+                department_id: original.DEPARTMENT_ID,
+                company_id: original.COMPANY_ID,
+                department_name: original.DEPARTMENT_NAME,
+                company_name: original.COMPANY_NAME,
+                period_from: original.PERIOD_FROM,
+                period_to: original.PERIOD_TO,
+                archived_count: -original.ARCHIVED_COUNT,
+                retrieved_count: -original.RETRIEVED_COUNT,
+                empty_carton_count: -original.EMPTY_CARTON_COUNT,
+                price_per_archived_box: original.PRICE_PER_ARCHIVED_BOX,
+                price_per_retrieved_box: original.PRICE_PER_RETRIEVED_BOX,
+                price_per_empty_carton: original.PRICE_PER_EMPTY_CARTON,
+                subtotal: -original.SUBTOTAL,
+                sscl_amount: -original.SSCL_AMOUNT,
+                vat_amount: -original.VAT_AMOUNT,
+                total_amount: -original.TOTAL_AMOUNT,
+                created_by: userId,
+                reverses_invoice_id: original.ID,
+            }
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err: any) {
+        if (err.code === '23505') {
+            return res.status(409).json({ message: 'This invoice has already been reversed' });
+        }
+        console.error('reverseInvoice error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 };
