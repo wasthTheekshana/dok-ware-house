@@ -8,7 +8,8 @@ export type PermissionKey =
     | 'manage_invoices'
     | 'manage_users'
     | 'manage_expenses'
-    | 'manage_staff';
+    | 'manage_staff'
+    | 'manage_payroll';
 
 export interface WhUser {
     ID: number;
@@ -211,4 +212,35 @@ export interface AttendanceSummary {
         half_day: number;
         leave: number;
     };
+}
+
+export type PayrollStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected';
+
+export interface Payroll {
+    ID: number;
+    STAFF_ID: number;
+    STAFF_NAME?: string;
+    WAREHOUSE_ID: number;
+    MONTH: number;
+    YEAR: number;
+    BASIC_PAY: number;
+    OT_AMOUNT: number;
+    DEDUCTIONS: number;
+    EPF_EMPLOYEE: number;
+    EPF_EMPLOYER: number;
+    ETF: number;
+    NET_SALARY: number;
+    STATUS: PayrollStatus;
+    REVERSES_PAYROLL_ID: number | null;
+    CREATED_BY: number | null;
+    APPROVED_BY: number | null;
+    CREATED_AT: string;
+    UPDATED_AT: string;
+}
+
+export interface PayrollReportRow {
+    WAREHOUSE_ID: number;
+    WAREHOUSE_NAME: string;
+    TOTAL_NET_SALARY: number;
+    TOTAL_EMPLOYER_COST: number;
 }

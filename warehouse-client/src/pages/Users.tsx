@@ -19,6 +19,7 @@ const PERMISSION_LABELS: { key: PermissionKey; label: string }[] = [
     { key: 'manage_users', label: 'Manage Users' },
     { key: 'manage_expenses', label: 'Manage Expenses' },
     { key: 'manage_staff', label: 'Manage Staff' },
+    { key: 'manage_payroll', label: 'Manage Payroll' },
 ];
 
 type OverrideState = 'default' | 'allow' | 'deny';
