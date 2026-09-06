@@ -20,6 +20,7 @@ const Payroll: React.FC = () => {
     const canManagePayroll = user?.EFFECTIVE_PERMISSIONS?.includes('manage_payroll') ?? false;
     const isApprover = user?.ROLE === 'system_admin' || user?.ROLE === 'finance_officer';
     const isScoped = user?.ROLE === 'warehouse_admin';
+    const canPrepareStaffList = user?.EFFECTIVE_PERMISSIONS?.includes('manage_staff') ?? false;
     const selectableWarehouseIds = user?.WAREHOUSE_IDS ?? [];
 
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -49,7 +50,7 @@ const Payroll: React.FC = () => {
     const [report, setReport] = useState<PayrollReportRow[]>([]);
 
     const loadRecords = () => {
-        api.get<PayrollRecord[]>('/payroll').then((res) => setRecords(res.data));
+        api.get<PayrollRecord[]>('/payroll').then((res) => setRecords(res.data)).catch(() => setRecords([]));
     };
 
     useEffect(() => {
@@ -62,18 +63,19 @@ const Payroll: React.FC = () => {
             if (selectable.length === 1) {
                 setSelectedWarehouseId(String(selectable[0].ID));
             }
-        }).finally(() => setLoading(false));
+        }).catch(() => setWarehouses([])).finally(() => setLoading(false));
         loadRecords();
     }, [canManagePayroll, isScoped]);
 
     useEffect(() => {
-        if (!selectedWarehouseId) {
+        if (!selectedWarehouseId || !canPrepareStaffList) {
             setStaffList([]);
             return;
         }
         api.get<Staff[]>('/staff', { params: { warehouse_id: selectedWarehouseId, status: 'active' } })
-            .then((res) => setStaffList(res.data));
-    }, [selectedWarehouseId]);
+            .then((res) => setStaffList(res.data))
+            .catch(() => setStaffList([]));
+    }, [selectedWarehouseId, canPrepareStaffList]);
 
     const handleCreate = async () => {
         if (!selectedStaffId) return;
@@ -122,6 +124,7 @@ const Payroll: React.FC = () => {
             await api.post(`/payroll/${id}/${action}`);
             toast.success(successMessage);
             loadRecords();
+            if (isApprover) loadReport();
         } catch (err: any) {
             toast.error(err?.response?.data?.message || `Failed to ${action} payroll`);
         }
@@ -129,7 +132,8 @@ const Payroll: React.FC = () => {
 
     const loadReport = () => {
         api.get<PayrollReportRow[]>('/payroll/report', { params: { year: reportYear, month: reportMonth } })
-            .then((res) => setReport(res.data));
+            .then((res) => setReport(res.data))
+            .catch(() => setReport([]));
     };
 
     useEffect(() => {
@@ -144,6 +148,7 @@ const Payroll: React.FC = () => {
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-slate-800">Payroll</h1>
 
+            {canPrepareStaffList && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
                 <h2 className="text-sm font-semibold text-slate-700">Prepare Payroll</h2>
                 <div className="grid grid-cols-4 gap-3 items-end">
@@ -184,6 +189,7 @@ const Payroll: React.FC = () => {
                     {creating ? 'Creating...' : 'Create Draft (pre-filled from attendance)'}
                 </button>
             </div>
+            )}
 
             <div className="bg-white rounded-xl border border-slate-200">
                 <table className="w-full text-sm">
@@ -195,6 +201,8 @@ const Payroll: React.FC = () => {
                             <th className="p-3">OT</th>
                             <th className="p-3">Deductions</th>
                             <th className="p-3">EPF (Emp.)</th>
+                            <th className="p-3">EPF (Emplr.)</th>
+                            <th className="p-3">ETF</th>
                             <th className="p-3">Net Salary</th>
                             <th className="p-3">Status</th>
                             <th className="p-3">Actions</th>
@@ -216,6 +224,12 @@ const Payroll: React.FC = () => {
                                     <td className="p-2">
                                         <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEpfEmployee} onChange={(e) => setEditEpfEmployee(e.target.value)} />
                                     </td>
+                                    <td className="p-2">
+                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEpfEmployer} onChange={(e) => setEditEpfEmployer(e.target.value)} />
+                                    </td>
+                                    <td className="p-2">
+                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEtf} onChange={(e) => setEditEtf(e.target.value)} />
+                                    </td>
                                     <td className="p-3">—</td>
                                     <td className="p-3 capitalize">{STATUS_LABELS[p.STATUS]}</td>
                                     <td className="p-2">
@@ -233,6 +247,8 @@ const Payroll: React.FC = () => {
                                     <td className="p-3">{p.OT_AMOUNT.toFixed(2)}</td>
                                     <td className="p-3">{p.DEDUCTIONS.toFixed(2)}</td>
                                     <td className="p-3">{p.EPF_EMPLOYEE.toFixed(2)}</td>
+                                    <td className="p-3">{p.EPF_EMPLOYER.toFixed(2)}</td>
+                                    <td className="p-3">{p.ETF.toFixed(2)}</td>
                                     <td className="p-3 font-medium">{p.NET_SALARY.toFixed(2)}</td>
                                     <td className="p-3">
                                         <span className={

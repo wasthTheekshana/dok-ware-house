@@ -110,6 +110,16 @@ describe('PUT /api/payroll/:id', () => {
         expect(res.status).toBe(400);
         expect(mockExecute).not.toHaveBeenCalled();
     });
+
+    it('returns 404 if the record was approved between the existence check and the update (race)', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, BASIC_PAY: 30000, OT_AMOUNT: 0, DEDUCTIONS: 2000, EPF_EMPLOYEE: 0, STATUS: 'draft' }] }) // existence+status check passes
+            .mockResolvedValueOnce({ rows: [] }); // UPDATE's own WHERE clause excludes it (status changed concurrently)
+
+        const res = await request(app).put('/api/payroll/1').send({ ot_amount: 1500 });
+
+        expect(res.status).toBe(404);
+    });
 });
 
 describe('POST /api/payroll — warehouse scoping for warehouse_admin', () => {

@@ -67,7 +67,10 @@ export const createPayroll = async (req: Request, res: Response) => {
             }
         );
         res.status(201).json(result.rows[0]);
-    } catch (err) {
+    } catch (err: any) {
+        if (err.code === '23505') {
+            return res.status(409).json({ message: 'A payroll record already exists for this staff member and period' });
+        }
         console.error('createPayroll error:', err);
         res.status(500).json({ message: 'Server error' });
     }
@@ -120,10 +123,18 @@ export const updatePayroll = async (req: Request, res: Response) => {
         const netSalary = computeNet(fields, existing);
         const setClauses = Object.keys(fields).map(key => `${key} = :${key}`).join(', ');
 
-        const result = await execute<any>(
-            `UPDATE payroll SET ${setClauses}, net_salary = :net_salary, updated_at = now() WHERE id = :id RETURNING *`,
-            { ...fields, net_salary: netSalary, id }
-        );
+        let updateQuery = `UPDATE payroll SET ${setClauses}, net_salary = :net_salary, updated_at = now() WHERE id = :id AND status IN ('draft', 'rejected')`;
+        const updateParams: any = { ...fields, net_salary: netSalary, id };
+        if (scope !== null) {
+            updateQuery += ` AND warehouse_id = ANY(:warehouse_ids)`;
+            updateParams.warehouse_ids = scope;
+        }
+        updateQuery += ` RETURNING *`;
+
+        const result = await execute<any>(updateQuery, updateParams);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Payroll record not found' });
+        }
         res.json(result.rows[0]);
     } catch (err) {
         console.error('updatePayroll error:', err);
