@@ -300,3 +300,62 @@ describe('POST /api/payroll/:id/reverse', () => {
         expect(res.status).toBe(409);
     });
 });
+
+describe('GET /api/payroll/report', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('returns one row per warehouse with net salary and employer cost totals', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [
+            { WAREHOUSE_ID: 1, WAREHOUSE_NAME: 'Dagonna', TOTAL_NET_SALARY: 28000, TOTAL_EMPLOYER_COST: 33800 },
+            { WAREHOUSE_ID: 2, WAREHOUSE_NAME: 'Warehouse B', TOTAL_NET_SALARY: 0, TOTAL_EMPLOYER_COST: 0 },
+        ] });
+
+        const res = await request(app).get('/api/payroll/report?year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(2);
+        const [query, params] = mockExecute.mock.calls[0];
+        expect(query).toMatch(/LEFT JOIN payroll p ON p\.warehouse_id = w\.id AND p\.status = 'approved'/);
+        expect(params).toMatchObject({ year: 2026, month: 9 });
+    });
+});
+
+describe('GET /api/payroll/report — warehouse scoping for warehouse_admin', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('scopes results to the warehouse_admin\'s own warehouse', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [2] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute.mockResolvedValueOnce({ rows: [{ WAREHOUSE_ID: 2, WAREHOUSE_NAME: 'Warehouse B', TOTAL_NET_SALARY: 0, TOTAL_EMPLOYER_COST: 0 }] });
+            return { execute };
+        });
+
+        const scopedRoutes = require('../routes/payrollRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/payroll', scopedRoutes);
+
+        const res = await request(scopedApp).get('/api/payroll/report?year=2026&month=9');
+
+        expect(res.status).toBe(200);
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        const [query, params] = scopedExecute.mock.calls[0];
+        expect(query).toMatch(/AND w\.id = ANY\(:warehouse_ids\)/);
+        expect(params.warehouse_ids).toEqual([2]);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});

@@ -21,3 +21,8 @@ export const payrollQuerySchema = z.object({
     year: z.string().regex(/^\d{4}$/, 'year must be a 4-digit number').optional(),
     status: z.enum(['draft', 'pending_approval', 'approved', 'rejected']).optional(),
 });
+
+export const payrollReportQuerySchema = z.object({
+    year: z.string().regex(/^\d{4}$/, 'year must be a 4-digit number'),
+    month: z.string().regex(/^(0?[1-9]|1[0-2])$/, 'month must be 1-12'),
+});

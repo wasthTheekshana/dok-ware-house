@@ -244,3 +244,31 @@ export const reversePayroll = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+export const getPayrollReport = async (req: Request, res: Response) => {
+    const { year, month } = req.query as { year: string; month: string };
+    const scope = warehouseScope(req);
+    try {
+        let query = `
+            SELECT w.id AS warehouse_id, w.name AS warehouse_name,
+                   COALESCE(SUM(p.net_salary), 0)::float AS total_net_salary,
+                   COALESCE(SUM(p.net_salary + p.epf_employer + p.etf), 0)::float AS total_employer_cost
+            FROM warehouses w
+            LEFT JOIN payroll p ON p.warehouse_id = w.id AND p.status = 'approved'
+                AND p.year = :year::int AND p.month = :month::int
+            WHERE 1=1
+        `;
+        const params: any = { year: Number(year), month: Number(month) };
+        if (scope !== null) {
+            query += ` AND w.id = ANY(:warehouse_ids)`;
+            params.warehouse_ids = scope;
+        }
+        query += ` GROUP BY w.id, w.name ORDER BY w.name`;
+
+        const result = await execute<any>(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('getPayrollReport error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
