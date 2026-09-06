@@ -265,16 +265,20 @@ describe('POST /api/payroll/:id/reverse', () => {
 
     it('inserts a negative-mirror row referencing the original', async () => {
         mockExecute
-            .mockResolvedValueOnce({ rows: [{ ID: 5, STAFF_ID: 1, WAREHOUSE_ID: 1, MONTH: 9, YEAR: 2026, BASIC_PAY: 30000, OT_AMOUNT: 0, DEDUCTIONS: 2000, EPF_EMPLOYEE: 0, EPF_EMPLOYER: 0, ETF: 0, NET_SALARY: 28000 }] })
-            .mockResolvedValueOnce({ rows: [{ ID: 6, REVERSES_PAYROLL_ID: 5, NET_SALARY: -28000 }] });
+            .mockResolvedValueOnce({ rows: [{ ID: 5, STAFF_ID: 1, WAREHOUSE_ID: 1, MONTH: 9, YEAR: 2026, BASIC_PAY: 30000, OT_AMOUNT: 1500, DEDUCTIONS: 2000, EPF_EMPLOYEE: 2400, EPF_EMPLOYER: 3600, ETF: 900, NET_SALARY: 27100 }] })
+            .mockResolvedValueOnce({ rows: [{ ID: 6, REVERSES_PAYROLL_ID: 5, NET_SALARY: -27100 }] });
 
         const res = await request(app).post('/api/payroll/5/reverse');
 
         expect(res.status).toBe(201);
         const [, insertParams] = mockExecute.mock.calls[1];
         expect(insertParams.basic_pay).toBe(-30000);
+        expect(insertParams.ot_amount).toBe(-1500);
         expect(insertParams.deductions).toBe(-2000);
-        expect(insertParams.net_salary).toBe(-28000);
+        expect(insertParams.epf_employee).toBe(-2400);
+        expect(insertParams.epf_employer).toBe(-3600);
+        expect(insertParams.etf).toBe(-900);
+        expect(insertParams.net_salary).toBe(-27100);
         expect(insertParams.reverses_payroll_id).toBe(5);
     });
 
