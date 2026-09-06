@@ -12,7 +12,7 @@ export interface InvoiceAmounts {
     totalAmount: number;
 }
 
-function round2(n: number): number {
+export function round2(n: number): number {
     return Math.round(n * 100) / 100;
 }
 

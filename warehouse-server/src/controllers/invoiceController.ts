@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { execute } from '../db/dbUtils';
-import { computeInvoiceAmounts } from '../utils/invoiceCalc';
+import { computeInvoiceAmounts, round2 } from '../utils/invoiceCalc';
 
 const SSCL_RATE = parseFloat(process.env.SSCL_RATE || '0.025641');
 const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.18');
@@ -66,7 +66,7 @@ async function computeBreakdown(department_id: number, period_from: string, peri
         PRICE_PER_RETRIEVED_BOX: dept.PRICE_PER_RETRIEVED_BOX,
         PRICE_PER_EMPTY_CARTON: dept.PRICE_PER_EMPTY_CARTON,
         BOX_COUNT_AT_BILLING: boxesStoredCount,
-        STORAGE_RENTAL_AMOUNT: dept.PRICE_PER_BOX_STORED_MONTHLY * boxesStoredCount,
+        STORAGE_RENTAL_AMOUNT: round2(dept.PRICE_PER_BOX_STORED_MONTHLY * boxesStoredCount),
         SUBTOTAL: amounts.subtotal,
         SSCL_AMOUNT: amounts.ssclAmount,
         VAT_AMOUNT: amounts.vatAmount,

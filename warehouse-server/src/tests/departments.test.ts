@@ -107,6 +107,9 @@ describe('Departments API', () => {
         expect(res.status).toBe(200);
         expect(res.body.PRICE_PER_ARCHIVED_BOX).toBe(50);
         expect(res.body.PRICE_PER_BOX_STORED_MONTHLY).toBe(5);
+        // Regression guard: assert the field actually reached the SQL UPDATE,
+        // not just that the (unconditional) mock response echoed it back.
+        expect(mockExecute.mock.calls[0][0]).toMatch(/price_per_box_stored_monthly/);
     });
 
     it('GET strips pricing fields for a non-admin user', async () => {
