@@ -19,6 +19,7 @@ const CompanyDetail: React.FC = () => {
     const [editArchivedPrice, setEditArchivedPrice] = useState('');
     const [editRetrievedPrice, setEditRetrievedPrice] = useState('');
     const [editEmptyCartonPrice, setEditEmptyCartonPrice] = useState('');
+    const [editStoredMonthlyPrice, setEditStoredMonthlyPrice] = useState('');
 
     const load = () => {
         setLoading(true);
@@ -58,6 +59,7 @@ const CompanyDetail: React.FC = () => {
         setEditArchivedPrice(String(d.PRICE_PER_ARCHIVED_BOX ?? 0));
         setEditRetrievedPrice(String(d.PRICE_PER_RETRIEVED_BOX ?? 0));
         setEditEmptyCartonPrice(String(d.PRICE_PER_EMPTY_CARTON ?? 0));
+        setEditStoredMonthlyPrice(String(d.PRICE_PER_BOX_STORED_MONTHLY ?? 0));
     };
 
     const cancelEditDept = () => setEditingDeptId(null);
@@ -68,6 +70,7 @@ const CompanyDetail: React.FC = () => {
             if (editArchivedPrice !== '') body.price_per_archived_box = Number(editArchivedPrice);
             if (editRetrievedPrice !== '') body.price_per_retrieved_box = Number(editRetrievedPrice);
             if (editEmptyCartonPrice !== '') body.price_per_empty_carton = Number(editEmptyCartonPrice);
+            if (editStoredMonthlyPrice !== '') body.price_per_box_stored_monthly = Number(editStoredMonthlyPrice);
             await api.put(`/departments/${deptId}`, body);
             toast.success('Pricing updated');
             setEditingDeptId(null);
@@ -130,6 +133,7 @@ const CompanyDetail: React.FC = () => {
                             <th className="p-3">Price/Archived</th>
                             <th className="p-3">Price/Retrieved</th>
                             <th className="p-3">Price/Empty Carton</th>
+                            <th className="p-3">Price/Storage Rental (monthly)</th>
                             <th className="p-3">Actions</th>
                         </tr>
                     </thead>
@@ -151,6 +155,9 @@ const CompanyDetail: React.FC = () => {
                                         <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editEmptyCartonPrice} onChange={(e) => setEditEmptyCartonPrice(e.target.value)} />
                                     </td>
                                     <td className="p-2">
+                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editStoredMonthlyPrice} onChange={(e) => setEditStoredMonthlyPrice(e.target.value)} />
+                                    </td>
+                                    <td className="p-2">
                                         <div className="flex gap-2">
                                             <button onClick={() => saveEditDept(d.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
                                             <button onClick={cancelEditDept} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
@@ -166,6 +173,7 @@ const CompanyDetail: React.FC = () => {
                                     <td className="p-3">{d.PRICE_PER_ARCHIVED_BOX}</td>
                                     <td className="p-3">{d.PRICE_PER_RETRIEVED_BOX}</td>
                                     <td className="p-3">{d.PRICE_PER_EMPTY_CARTON}</td>
+                                    <td className="p-3">{d.PRICE_PER_BOX_STORED_MONTHLY}</td>
                                     <td className="p-3">
                                         <button onClick={() => startEditDept(d)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
                                     </td>

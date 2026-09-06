@@ -161,6 +161,10 @@ const Invoices: React.FC = () => {
                                 <td className="p-2">Empty cartons</td>
                                 <td className="p-2">{preview.EMPTY_CARTON_COUNT} × {preview.PRICE_PER_EMPTY_CARTON}</td>
                             </tr>
+                            <tr className="border-t border-slate-100">
+                                <td className="p-2">Storage rental</td>
+                                <td className="p-2">{preview.BOX_COUNT_AT_BILLING} boxes × {preview.STORAGE_RENTAL_AMOUNT / (preview.BOX_COUNT_AT_BILLING || 1)} = {preview.STORAGE_RENTAL_AMOUNT}</td>
+                            </tr>
                             <tr className="border-t border-slate-200 font-medium">
                                 <td className="p-2">Subtotal</td>
                                 <td className="p-2">{preview.SUBTOTAL}</td>

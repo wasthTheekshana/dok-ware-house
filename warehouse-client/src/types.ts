@@ -81,6 +81,7 @@ export interface Department {
     PRICE_PER_ARCHIVED_BOX: number;
     PRICE_PER_RETRIEVED_BOX: number;
     PRICE_PER_EMPTY_CARTON: number;
+    PRICE_PER_BOX_STORED_MONTHLY: number;
 }
 
 export interface InvoiceBreakdown {
@@ -96,6 +97,8 @@ export interface InvoiceBreakdown {
     PRICE_PER_ARCHIVED_BOX: number;
     PRICE_PER_RETRIEVED_BOX: number;
     PRICE_PER_EMPTY_CARTON: number;
+    BOX_COUNT_AT_BILLING: number;
+    STORAGE_RENTAL_AMOUNT: number;
     SUBTOTAL: number;
     SSCL_AMOUNT: number;
     VAT_AMOUNT: number;
