@@ -14,4 +14,5 @@ export const updateDepartmentSchema = z.object({
     price_per_archived_box: z.number().nonnegative().optional(),
     price_per_retrieved_box: z.number().nonnegative().optional(),
     price_per_empty_carton: z.number().nonnegative().optional(),
+    price_per_box_stored_monthly: z.number().nonnegative().optional(),
 }).refine(data => Object.keys(data).length > 0, { message: 'At least one field required' });

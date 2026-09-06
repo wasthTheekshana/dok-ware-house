@@ -11,7 +11,7 @@ export const getDepartments = async (req: Request, res: Response) => {
     try {
         let query = `
             SELECT d.id, d.company_id, d.warehouse_id, d.name, d.code, d.status, d.current_box_count,
-                   d.price_per_archived_box, d.price_per_retrieved_box, d.price_per_empty_carton,
+                   d.price_per_archived_box, d.price_per_retrieved_box, d.price_per_empty_carton, d.price_per_box_stored_monthly,
                    w.name AS warehouse_name
             FROM departments d
             JOIN warehouses w ON w.id = d.warehouse_id
@@ -31,7 +31,7 @@ export const getDepartments = async (req: Request, res: Response) => {
         const rows = canSeePricing(user?.role)
             ? result.rows
             : result.rows.map((row: any) => {
-                const { PRICE_PER_ARCHIVED_BOX, PRICE_PER_RETRIEVED_BOX, PRICE_PER_EMPTY_CARTON, ...rest } = row;
+                const { PRICE_PER_ARCHIVED_BOX, PRICE_PER_RETRIEVED_BOX, PRICE_PER_EMPTY_CARTON, PRICE_PER_BOX_STORED_MONTHLY, ...rest } = row;
                 return rest;
             });
         res.json(rows);

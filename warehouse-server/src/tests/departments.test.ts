@@ -94,17 +94,19 @@ describe('Departments API', () => {
 
     it('PUT /api/departments/:id accepts pricing fields', async () => {
         mockExecute.mockResolvedValueOnce({
-            rows: [{ ID: 1, PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20 }],
+            rows: [{ ID: 1, PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20, PRICE_PER_BOX_STORED_MONTHLY: 5 }],
         });
 
         const res = await request(app).put('/api/departments/1').send({
             price_per_archived_box: 50,
             price_per_retrieved_box: 45,
             price_per_empty_carton: 20,
+            price_per_box_stored_monthly: 5,
         });
 
         expect(res.status).toBe(200);
         expect(res.body.PRICE_PER_ARCHIVED_BOX).toBe(50);
+        expect(res.body.PRICE_PER_BOX_STORED_MONTHLY).toBe(5);
     });
 
     it('GET strips pricing fields for a non-admin user', async () => {
@@ -122,7 +124,7 @@ describe('Departments API', () => {
         jest.doMock('../db/dbUtils', () => ({ execute: mockExecute }));
 
         mockExecute.mockResolvedValueOnce({
-            rows: [{ ID: 10, NAME: 'CASH DEPT', PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20 }],
+            rows: [{ ID: 10, NAME: 'CASH DEPT', PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20, PRICE_PER_BOX_STORED_MONTHLY: 5 }],
         });
 
         const staffRoutes = require('../routes/departmentRoutes').default;
@@ -137,6 +139,7 @@ describe('Departments API', () => {
         expect(res.body[0].PRICE_PER_ARCHIVED_BOX).toBeUndefined();
         expect(res.body[0].PRICE_PER_RETRIEVED_BOX).toBeUndefined();
         expect(res.body[0].PRICE_PER_EMPTY_CARTON).toBeUndefined();
+        expect(res.body[0].PRICE_PER_BOX_STORED_MONTHLY).toBeUndefined();
 
         jest.dontMock('../middleware/authMiddleware');
         jest.dontMock('../middleware/permissionMiddleware');

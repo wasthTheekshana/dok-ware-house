@@ -100,7 +100,7 @@ describe('Companies API', () => {
         mockExecute
             .mockResolvedValueOnce({ rows: [{ ID: 1, NAME: 'AB Securitas' }] })
             .mockResolvedValueOnce({
-                rows: [{ ID: 10, NAME: 'CASH DEPT', CURRENT_BOX_COUNT: 30, PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20 }],
+                rows: [{ ID: 10, NAME: 'CASH DEPT', CURRENT_BOX_COUNT: 30, PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20, PRICE_PER_BOX_STORED_MONTHLY: 5 }],
             });
 
         const staffRoutes = require('../routes/companyRoutes').default;
@@ -115,6 +115,7 @@ describe('Companies API', () => {
         expect(res.body.DEPARTMENTS[0].PRICE_PER_ARCHIVED_BOX).toBeUndefined();
         expect(res.body.DEPARTMENTS[0].PRICE_PER_RETRIEVED_BOX).toBeUndefined();
         expect(res.body.DEPARTMENTS[0].PRICE_PER_EMPTY_CARTON).toBeUndefined();
+        expect(res.body.DEPARTMENTS[0].PRICE_PER_BOX_STORED_MONTHLY).toBeUndefined();
 
         jest.dontMock('../middleware/authMiddleware');
         jest.dontMock('../middleware/permissionMiddleware');
