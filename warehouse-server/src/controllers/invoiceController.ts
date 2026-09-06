@@ -11,7 +11,8 @@ if (isNaN(SSCL_RATE) || isNaN(VAT_RATE)) {
 async function computeBreakdown(department_id: number, period_from: string, period_to: string) {
     const deptResult = await execute<any>(
         `SELECT d.id, d.company_id, d.name AS department_name, c.name AS company_name,
-                d.price_per_archived_box, d.price_per_retrieved_box, d.price_per_empty_carton
+                d.price_per_archived_box, d.price_per_retrieved_box, d.price_per_empty_carton,
+                d.current_box_count, d.price_per_box_stored_monthly
          FROM departments d
          JOIN companies c ON c.id = d.company_id
          WHERE d.id = :department_id`,
@@ -34,14 +35,18 @@ async function computeBreakdown(department_id: number, period_from: string, peri
         counts[row.EVENT_TYPE] = row.TOTAL;
     }
 
+    const boxesStoredCount = dept.CURRENT_BOX_COUNT;
+
     const amounts = computeInvoiceAmounts(
         counts.archived,
         counts.retrieved,
         counts.empty_carton_issued,
+        boxesStoredCount,
         {
             archived: dept.PRICE_PER_ARCHIVED_BOX,
             retrieved: dept.PRICE_PER_RETRIEVED_BOX,
             emptyCarton: dept.PRICE_PER_EMPTY_CARTON,
+            storedMonthly: dept.PRICE_PER_BOX_STORED_MONTHLY,
         },
         SSCL_RATE,
         VAT_RATE
@@ -60,6 +65,8 @@ async function computeBreakdown(department_id: number, period_from: string, peri
         PRICE_PER_ARCHIVED_BOX: dept.PRICE_PER_ARCHIVED_BOX,
         PRICE_PER_RETRIEVED_BOX: dept.PRICE_PER_RETRIEVED_BOX,
         PRICE_PER_EMPTY_CARTON: dept.PRICE_PER_EMPTY_CARTON,
+        BOX_COUNT_AT_BILLING: boxesStoredCount,
+        STORAGE_RENTAL_AMOUNT: dept.PRICE_PER_BOX_STORED_MONTHLY * boxesStoredCount,
         SUBTOTAL: amounts.subtotal,
         SSCL_AMOUNT: amounts.ssclAmount,
         VAT_AMOUNT: amounts.vatAmount,
@@ -95,11 +102,13 @@ export const createInvoice = async (req: Request, res: Response) => {
                 department_id, company_id, department_name, company_name,
                 period_from, period_to, archived_count, retrieved_count, empty_carton_count,
                 price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
+                box_count_at_billing, storage_rental_amount,
                 subtotal, sscl_amount, vat_amount, total_amount, created_by
             ) VALUES (
                 :department_id, :company_id, :department_name, :company_name,
                 :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
                 :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
+                :box_count_at_billing, :storage_rental_amount,
                 :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by
             ) RETURNING *`,
             {
@@ -115,6 +124,8 @@ export const createInvoice = async (req: Request, res: Response) => {
                 price_per_archived_box: breakdown.PRICE_PER_ARCHIVED_BOX,
                 price_per_retrieved_box: breakdown.PRICE_PER_RETRIEVED_BOX,
                 price_per_empty_carton: breakdown.PRICE_PER_EMPTY_CARTON,
+                box_count_at_billing: breakdown.BOX_COUNT_AT_BILLING,
+                storage_rental_amount: breakdown.STORAGE_RENTAL_AMOUNT,
                 subtotal: breakdown.SUBTOTAL,
                 sscl_amount: breakdown.SSCL_AMOUNT,
                 vat_amount: breakdown.VAT_AMOUNT,
@@ -168,11 +179,13 @@ export const reverseInvoice = async (req: Request, res: Response) => {
                 department_id, company_id, department_name, company_name,
                 period_from, period_to, archived_count, retrieved_count, empty_carton_count,
                 price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
+                box_count_at_billing, storage_rental_amount,
                 subtotal, sscl_amount, vat_amount, total_amount, created_by, reverses_invoice_id
             ) VALUES (
                 :department_id, :company_id, :department_name, :company_name,
                 :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
                 :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
+                :box_count_at_billing, :storage_rental_amount,
                 :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by, :reverses_invoice_id
             ) RETURNING *`,
             {
@@ -188,6 +201,8 @@ export const reverseInvoice = async (req: Request, res: Response) => {
                 price_per_archived_box: original.PRICE_PER_ARCHIVED_BOX,
                 price_per_retrieved_box: original.PRICE_PER_RETRIEVED_BOX,
                 price_per_empty_carton: original.PRICE_PER_EMPTY_CARTON,
+                box_count_at_billing: original.BOX_COUNT_AT_BILLING,
+                storage_rental_amount: -original.STORAGE_RENTAL_AMOUNT,
                 subtotal: -original.SUBTOTAL,
                 sscl_amount: -original.SSCL_AMOUNT,
                 vat_amount: -original.VAT_AMOUNT,
