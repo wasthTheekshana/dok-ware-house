@@ -109,7 +109,7 @@ export interface Invoice extends InvoiceBreakdown {
     REVERSES_INVOICE_ID: number | null;
 }
 
-export type BoxEventType = 'archived' | 'retrieved' | 'empty_carton_issued';
+export type BoxEventType = 'archived' | 'retrieved' | 'empty_carton_issued' | 'disposed';
 
 export interface BoxEvent {
     ID: number;

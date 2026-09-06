@@ -75,6 +75,30 @@ describe('POST /api/box-events', () => {
         expect(res.status).toBe(400);
         expect(mockExecute).not.toHaveBeenCalled();
     });
+
+    it('creates a disposed event and decrements the department count', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, CURRENT_BOX_COUNT: 100 }] }) // SELECT ... FOR UPDATE
+            .mockResolvedValueOnce({ rows: [] })                                  // UPDATE departments
+            .mockResolvedValueOnce({ rows: [{ ID: 1, DEPARTMENT_ID: 1, EVENT_TYPE: 'disposed', QUANTITY: 15 }] }); // INSERT
+
+        const res = await request(app).post('/api/box-events').send({ ...VALID_BODY, event_type: 'disposed', quantity: 15 });
+
+        expect(res.status).toBe(201);
+        const updateCall = mockExecute.mock.calls[1];
+        expect(updateCall[0]).toMatch(/UPDATE departments SET current_box_count/);
+        expect(updateCall[1]).toMatchObject({ new_count: 85 });
+    });
+
+    it('rejects a disposed event that would go negative', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, CURRENT_BOX_COUNT: 5 }] }); // SELECT ... FOR UPDATE
+
+        const res = await request(app).post('/api/box-events').send({ ...VALID_BODY, event_type: 'disposed', quantity: 6 });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/Insufficient boxes/);
+        expect(mockExecute).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe('GET /api/box-events', () => {

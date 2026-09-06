@@ -21,6 +21,18 @@ describe('applyBoxEvent', () => {
     it('throws when a retrieved event would take the count negative', () => {
         expect(() => applyBoxEvent(10, 'retrieved', 11)).toThrow('Insufficient boxes');
     });
+
+    it('decreases the count for a disposed event', () => {
+        expect(applyBoxEvent(100, 'disposed', 40)).toBe(60);
+    });
+
+    it('allows a disposed event that exactly empties the count', () => {
+        expect(applyBoxEvent(50, 'disposed', 50)).toBe(0);
+    });
+
+    it('throws when a disposed event would take the count negative', () => {
+        expect(() => applyBoxEvent(10, 'disposed', 11)).toThrow('Insufficient boxes');
+    });
 });
 
 describe('eventDelta', () => {
@@ -34,5 +46,9 @@ describe('eventDelta', () => {
 
     it('returns zero delta for an empty_carton_issued event', () => {
         expect(eventDelta('empty_carton_issued', 10)).toBe(0);
+    });
+
+    it('returns a negative delta for a disposed event', () => {
+        expect(eventDelta('disposed', 40)).toBe(-40);
     });
 });

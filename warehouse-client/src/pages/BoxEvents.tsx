@@ -9,6 +9,7 @@ const EVENT_TYPES: { value: BoxEventType; label: string }[] = [
     { value: 'archived', label: 'Archived (new boxes)' },
     { value: 'retrieved', label: 'Retrieved' },
     { value: 'empty_carton_issued', label: 'Empty Carton Issued' },
+    { value: 'disposed', label: 'Disposed' },
 ];
 
 const BoxEvents: React.FC = () => {
