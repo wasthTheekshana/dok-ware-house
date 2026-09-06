@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const PERMISSION_KEY_VALUES = [
     'manage_companies', 'manage_warehouses', 'manage_box_events',
-    'view_invoices', 'manage_invoices', 'manage_users', 'manage_expenses', 'manage_staff',
+    'view_invoices', 'manage_invoices', 'manage_users', 'manage_expenses', 'manage_staff', 'manage_payroll',
 ] as const;
 
 const permissionOverrideSchema = z.object({
