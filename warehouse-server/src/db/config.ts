@@ -148,6 +148,7 @@ export async function initializeDb() {
                 price_per_archived_box    NUMERIC(12,2) NOT NULL DEFAULT 0,
                 price_per_retrieved_box   NUMERIC(12,2) NOT NULL DEFAULT 0,
                 price_per_empty_carton    NUMERIC(12,2) NOT NULL DEFAULT 0,
+                price_per_box_stored_monthly NUMERIC(12,2) NOT NULL DEFAULT 0,
                 created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
                 UNIQUE (company_id, name)
             )
@@ -161,6 +162,9 @@ export async function initializeDb() {
         `);
         await client.query(`
             ALTER TABLE departments ADD COLUMN IF NOT EXISTS price_per_empty_carton NUMERIC(12,2) NOT NULL DEFAULT 0
+        `);
+        await client.query(`
+            ALTER TABLE departments ADD COLUMN IF NOT EXISTS price_per_box_stored_monthly NUMERIC(12,2) NOT NULL DEFAULT 0
         `);
 
         await client.query(`
@@ -298,6 +302,8 @@ export async function initializeDb() {
                 price_per_archived_box    NUMERIC(12,2) NOT NULL,
                 price_per_retrieved_box   NUMERIC(12,2) NOT NULL,
                 price_per_empty_carton    NUMERIC(12,2) NOT NULL,
+                box_count_at_billing      INTEGER NOT NULL DEFAULT 0,
+                storage_rental_amount     NUMERIC(14,2) NOT NULL DEFAULT 0,
                 subtotal                  NUMERIC(14,2) NOT NULL,
                 sscl_amount               NUMERIC(14,2) NOT NULL,
                 vat_amount                NUMERIC(14,2) NOT NULL,
@@ -310,6 +316,12 @@ export async function initializeDb() {
 
         await client.query(`
             ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reverses_invoice_id INTEGER REFERENCES invoices(id)
+        `);
+        await client.query(`
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS box_count_at_billing INTEGER NOT NULL DEFAULT 0
+        `);
+        await client.query(`
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS storage_rental_amount NUMERIC(14,2) NOT NULL DEFAULT 0
         `);
 
         await client.query(`
