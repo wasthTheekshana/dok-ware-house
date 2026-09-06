@@ -2,6 +2,7 @@ export interface InvoicePrices {
     archived: number;
     retrieved: number;
     emptyCarton: number;
+    storedMonthly: number;
 }
 
 export interface InvoiceAmounts {
@@ -19,6 +20,7 @@ export function computeInvoiceAmounts(
     archivedCount: number,
     retrievedCount: number,
     emptyCartonCount: number,
+    boxesStoredCount: number,
     prices: InvoicePrices,
     ssclRate: number,
     vatRate: number
@@ -26,7 +28,8 @@ export function computeInvoiceAmounts(
     const subtotal = round2(
         archivedCount * prices.archived +
         retrievedCount * prices.retrieved +
-        emptyCartonCount * prices.emptyCarton
+        emptyCartonCount * prices.emptyCarton +
+        boxesStoredCount * prices.storedMonthly
     );
     const ssclAmount = round2(subtotal * ssclRate);
     const vatAmount = round2((subtotal + ssclAmount) * vatRate);
