@@ -151,3 +151,148 @@ describe('POST /api/payroll — warehouse scoping for warehouse_admin', () => {
         jest.resetModules();
     });
 });
+
+describe('POST /api/payroll/:id/submit', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('moves a draft to pending_approval', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'pending_approval' }] });
+
+        const res = await request(app).post('/api/payroll/1/submit');
+
+        expect(res.status).toBe(200);
+        expect(mockExecute.mock.calls[0][0]).toMatch(/status = 'pending_approval'/);
+        expect(mockExecute.mock.calls[0][0]).toMatch(/status IN \('draft', 'rejected'\)/);
+    });
+
+    it('returns 404 when the record is not draft/rejected', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+
+        const res = await request(app).post('/api/payroll/1/submit');
+
+        expect(res.status).toBe(404);
+    });
+});
+
+describe('POST /api/payroll/:id/approve', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('approves a pending_approval record as system_admin', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'approved', APPROVED_BY: 1 }] });
+
+        const res = await request(app).post('/api/payroll/1/approve');
+
+        expect(res.status).toBe(200);
+    });
+
+    it('returns 404 when the record is not pending_approval', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+
+        const res = await request(app).post('/api/payroll/1/approve');
+
+        expect(res.status).toBe(404);
+    });
+
+    it('rejects a warehouse_admin attempting to approve, even though they hold manage_payroll', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 9, role: 'warehouse_admin', warehouse_ids: [1] };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => ({ execute: jest.fn() }));
+
+        const scopedRoutes = require('../routes/payrollRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/payroll', scopedRoutes);
+
+        const res = await request(scopedApp).post('/api/payroll/1/approve');
+
+        expect(res.status).toBe(403);
+        const { execute: scopedExecute } = require('../db/dbUtils');
+        expect(scopedExecute).not.toHaveBeenCalled();
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('POST /api/payroll/:id/reject', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('rejects a pending_approval record as finance_officer', async () => {
+        jest.resetModules();
+        jest.doMock('../middleware/authMiddleware', () => ({
+            authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+                (req as any).user = { id: 3, role: 'finance_officer' };
+                next();
+            },
+        }));
+        jest.doMock('../middleware/permissionMiddleware', () => ({
+            requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
+        }));
+        jest.doMock('../db/dbUtils', () => {
+            const execute = jest.fn();
+            execute.mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'rejected' }] });
+            return { execute };
+        });
+
+        const scopedRoutes = require('../routes/payrollRoutes').default;
+        const scopedApp = express();
+        scopedApp.use(express.json());
+        scopedApp.use('/api/payroll', scopedRoutes);
+
+        const res = await request(scopedApp).post('/api/payroll/1/reject');
+
+        expect(res.status).toBe(200);
+
+        jest.dontMock('../middleware/authMiddleware');
+        jest.dontMock('../middleware/permissionMiddleware');
+        jest.dontMock('../db/dbUtils');
+        jest.resetModules();
+    });
+});
+
+describe('POST /api/payroll/:id/reverse', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('inserts a negative-mirror row referencing the original', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 5, STAFF_ID: 1, WAREHOUSE_ID: 1, MONTH: 9, YEAR: 2026, BASIC_PAY: 30000, OT_AMOUNT: 0, DEDUCTIONS: 2000, EPF_EMPLOYEE: 0, EPF_EMPLOYER: 0, ETF: 0, NET_SALARY: 28000 }] })
+            .mockResolvedValueOnce({ rows: [{ ID: 6, REVERSES_PAYROLL_ID: 5, NET_SALARY: -28000 }] });
+
+        const res = await request(app).post('/api/payroll/5/reverse');
+
+        expect(res.status).toBe(201);
+        const [, insertParams] = mockExecute.mock.calls[1];
+        expect(insertParams.basic_pay).toBe(-30000);
+        expect(insertParams.deductions).toBe(-2000);
+        expect(insertParams.net_salary).toBe(-28000);
+        expect(insertParams.reverses_payroll_id).toBe(5);
+    });
+
+    it('rejects reversing a non-approved record', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+
+        const res = await request(app).post('/api/payroll/5/reverse');
+
+        expect(res.status).toBe(400);
+    });
+
+    it('returns 409 when the record has already been reversed', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 5, STAFF_ID: 1, WAREHOUSE_ID: 1, MONTH: 9, YEAR: 2026, BASIC_PAY: 30000, OT_AMOUNT: 0, DEDUCTIONS: 0, EPF_EMPLOYEE: 0, EPF_EMPLOYER: 0, ETF: 0, NET_SALARY: 30000 }] })
+            .mockRejectedValueOnce({ code: '23505' });
+
+        const res = await request(app).post('/api/payroll/5/reverse');
+
+        expect(res.status).toBe(409);
+    });
+});
