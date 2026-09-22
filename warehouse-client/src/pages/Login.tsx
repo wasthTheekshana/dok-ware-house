@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { LoginResponse } from '../types';
+import { Button } from '../components/ui';
 
 const Login: React.FC = () => {
     const [username, setUsername] = useState('');
@@ -27,32 +28,36 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="flex items-center justify-center h-screen bg-slate-50">
-            <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 w-80">
-                <h1 className="text-xl font-bold text-slate-800 mb-6">DOK Warehouse Login</h1>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Username</label>
-                <input
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                />
-                <label className="block text-sm font-medium text-slate-600 mb-1">Password</label>
-                <input
-                    type="password"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-6"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                />
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-blue-600 text-white rounded-lg py-2 font-medium hover:bg-blue-700 disabled:opacity-50"
-                >
-                    {loading ? 'Signing in...' : 'Sign in'}
-                </button>
-            </form>
+        <div className="flex h-screen">
+            <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-brand-600 to-brand-400 text-white flex-col justify-center px-16">
+                <div className="w-12 h-12 rounded-xl bg-white/20 mb-6" />
+                <h1 className="text-3xl font-extrabold mb-3">DOK Warehouse</h1>
+                <p className="text-sm text-white/85 max-w-sm">Document archiving &amp; warehouse management, simplified.</p>
+            </div>
+            <div className="flex-1 flex items-center justify-center bg-slate-50 px-6">
+                <form onSubmit={handleSubmit} className="bg-white p-8 rounded-card shadow-soft w-full max-w-sm">
+                    <h2 className="text-xl font-bold text-slate-800 mb-1">Welcome back</h2>
+                    <p className="text-sm text-slate-400 mb-6">Sign in to your account</p>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">Username</label>
+                    <input
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                    />
+                    <label className="block text-sm font-medium text-slate-600 mb-1">Password</label>
+                    <input
+                        type="password"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-6"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                    />
+                    <Button type="submit" variant="primary" disabled={loading} className="w-full">
+                        {loading ? 'Signing in...' : 'Sign in'}
+                    </Button>
+                </form>
+            </div>
         </div>
     );
 };
