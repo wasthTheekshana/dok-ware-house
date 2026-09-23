@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
                     <div className="text-sm font-semibold text-slate-700 mb-4">Box Movement — Last 6 Months</div>
                     <div className="flex items-end gap-3 h-28">
                         {archivedRetrievedByMonth.map((m) => (
-                            <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                            <div key={m.month} className="flex-1 h-full flex flex-col justify-end items-center gap-1">
                                 <div
                                     className="w-full rounded-t bg-gradient-to-b from-brand-400 to-brand-600"
                                     style={{ height: `${Math.max(4, (m.total / maxMonthTotal) * 100)}%` }}
