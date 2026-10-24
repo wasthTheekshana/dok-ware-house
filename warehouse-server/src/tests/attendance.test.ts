@@ -45,15 +45,19 @@ describe('POST /api/attendance/bulk-mark', () => {
     it('upserts every entry in one transaction when all staff belong to warehouse_id', async () => {
         mockExecute
             .mockResolvedValueOnce({ rows: [{ ID: 1 }, { ID: 2 }] }) // staff existence check
+            .mockResolvedValueOnce({ rows: [] }) // pre-upsert lookup for entry 1 (no prior record)
             .mockResolvedValueOnce({ rows: [{ ID: 10, STAFF_ID: 1, STATUS: 'present' }] }) // upsert 1
-            .mockResolvedValueOnce({ rows: [{ ID: 11, STAFF_ID: 2, STATUS: 'absent' }] }); // upsert 2
+            .mockResolvedValueOnce({ rows: [] }) // audit insert for entry 1
+            .mockResolvedValueOnce({ rows: [] }) // pre-upsert lookup for entry 2 (no prior record)
+            .mockResolvedValueOnce({ rows: [{ ID: 11, STAFF_ID: 2, STATUS: 'absent' }] }) // upsert 2
+            .mockResolvedValueOnce({ rows: [] }); // audit insert for entry 2
 
         const res = await request(app).post('/api/attendance/bulk-mark').send(VALID_BODY);
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveLength(2);
-        expect(mockExecute.mock.calls[1][0]).toMatch(/INSERT INTO attendance/);
-        expect(mockExecute.mock.calls[1][0]).toMatch(/ON CONFLICT \(staff_id, attendance_date\)/);
+        expect(mockExecute.mock.calls[2][0]).toMatch(/INSERT INTO attendance/);
+        expect(mockExecute.mock.calls[2][0]).toMatch(/ON CONFLICT \(staff_id, attendance_date\)/);
     });
 
     it('rejects the whole batch when one staff_id does not belong to warehouse_id', async () => {
@@ -75,6 +79,62 @@ describe('POST /api/attendance/bulk-mark', () => {
 
         expect(res.status).toBe(400);
         expect(mockExecute).not.toHaveBeenCalled();
+    });
+});
+
+describe('bulkMarkAttendance audit logging', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('logs one create row for a staff member with no prior record for that date, and one update row for a staff member with an existing record', async () => {
+        const existingRow = { ID: 20, STAFF_ID: 2, STATUS: 'present', ATTENDANCE_DATE: '2026-09-05' };
+
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1 }, { ID: 2 }] }) // staff existence check
+            .mockResolvedValueOnce({ rows: [] }) // pre-upsert lookup for staff_id 1: no prior record
+            .mockResolvedValueOnce({ rows: [{ ID: 10, STAFF_ID: 1, STATUS: 'present' }] }) // upsert 1
+            .mockResolvedValueOnce({ rows: [] }) // audit insert for entry 1
+            .mockResolvedValueOnce({ rows: [existingRow] }) // pre-upsert lookup for staff_id 2: existing record
+            .mockResolvedValueOnce({ rows: [{ ID: 20, STAFF_ID: 2, STATUS: 'absent' }] }) // upsert 2
+            .mockResolvedValueOnce({ rows: [] }); // audit insert for entry 2
+
+        const res = await request(app).post('/api/attendance/bulk-mark').send(VALID_BODY);
+
+        expect(res.status).toBe(200);
+
+        // Audit insert for entry 1 (staff_id 1): create, before_value null
+        const [auditQuery1, auditParams1] = mockExecute.mock.calls[3];
+        expect(auditQuery1).toMatch(/INSERT INTO audit_log/);
+        expect(auditParams1).toMatchObject({
+            table_name: 'attendance',
+            record_id: 10,
+            action: 'create',
+            before_value: null,
+        });
+
+        // Audit insert for entry 2 (staff_id 2): update, before_value equal to the existing row
+        const [auditQuery2, auditParams2] = mockExecute.mock.calls[6];
+        expect(auditQuery2).toMatch(/INSERT INTO audit_log/);
+        expect(auditParams2).toMatchObject({
+            table_name: 'attendance',
+            record_id: 20,
+            action: 'update',
+            before_value: JSON.stringify(existingRow),
+        });
+    });
+
+    it('rolls back all upserts in the batch if one audit insert fails', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1 }, { ID: 2 }] }) // staff existence check
+            .mockResolvedValueOnce({ rows: [] }) // pre-upsert lookup for entry 1
+            .mockResolvedValueOnce({ rows: [{ ID: 10, STAFF_ID: 1, STATUS: 'present' }] }) // upsert 1
+            .mockResolvedValueOnce({ rows: [] }) // audit insert for entry 1 succeeds
+            .mockResolvedValueOnce({ rows: [] }) // pre-upsert lookup for entry 2
+            .mockResolvedValueOnce({ rows: [{ ID: 11, STAFF_ID: 2, STATUS: 'absent' }] }) // upsert 2
+            .mockRejectedValueOnce(new Error('audit insert failed')); // audit insert for entry 2 fails
+
+        const res = await request(app).post('/api/attendance/bulk-mark').send(VALID_BODY);
+
+        expect(res.status).toBeGreaterThanOrEqual(400);
     });
 });
 

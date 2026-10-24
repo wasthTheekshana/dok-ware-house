@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { execute, withTransaction } from '../db/dbUtils';
+import { logAudit } from '../utils/auditLog';
 
 function warehouseScope(req: Request): number[] | null {
     const user = (req as any).user;
@@ -31,6 +32,12 @@ export const bulkMarkAttendance = async (req: Request, res: Response) => {
 
             const results = [];
             for (const entry of entries) {
+                const existingResult = await exec<any>(
+                    `SELECT * FROM attendance WHERE staff_id = :staff_id AND attendance_date = :attendance_date`,
+                    { staff_id: entry.staff_id, attendance_date }
+                );
+                const before = existingResult.rows[0] ?? null;
+
                 const upsertResult = await exec<any>(
                     `INSERT INTO attendance (staff_id, attendance_date, status, in_time, out_time)
                      VALUES (:staff_id, :attendance_date, :status, :in_time, :out_time)
@@ -46,6 +53,16 @@ export const bulkMarkAttendance = async (req: Request, res: Response) => {
                     }
                 );
                 results.push(upsertResult.rows[0]);
+
+                await logAudit(
+                    exec,
+                    'attendance',
+                    upsertResult.rows[0].ID,
+                    before === null ? 'create' : 'update',
+                    (req as any).user?.id ?? null,
+                    before,
+                    upsertResult.rows[0]
+                );
             }
             return results;
         });
