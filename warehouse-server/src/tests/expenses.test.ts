@@ -15,16 +15,24 @@ jest.mock('../middleware/permissionMiddleware', () => ({
 
 jest.mock('../db/dbUtils', () => {
     const execute = jest.fn();
+    const txExec = jest.fn();
     return {
         execute,
-        withTransaction: jest.fn(async (fn: any) => fn(execute)),
+        txExec,
+        withTransaction: jest.fn(async (fn: any) => fn(txExec)),
     };
 });
 
 import expenseRoutes from '../routes/expenseRoutes';
 import { execute } from '../db/dbUtils';
+import * as dbUtils from '../db/dbUtils';
 
 const mockExecute = execute as jest.Mock;
+// The mock's transactional executor, distinct from the module-level `execute`. Any write that
+// goes through withTransaction must be queued on this mock, not mockExecute — queuing a write
+// on mockExecute instead would silently hide a bug where the controller writes outside the
+// transaction (see the "rolls back the insert..." test below).
+const mockTxExec = (dbUtils as any).txExec as jest.Mock;
 
 const app = express();
 app.use(express.json());
@@ -33,20 +41,20 @@ app.use('/api/expenses', expenseRoutes);
 const VALID_BODY = { warehouse_id: 1, expense_date: '2026-09-01', transport_amount: 500, fuel_amount: 1000 };
 
 describe('POST /api/expenses', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('creates an entry with the given amounts, defaulting missing categories to 0', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, EXPENSE_DATE: '2026-09-01', TRANSPORT_AMOUNT: 500, FUEL_AMOUNT: 1000, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0 }] });
+        mockTxExec.mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, EXPENSE_DATE: '2026-09-01', TRANSPORT_AMOUNT: 500, FUEL_AMOUNT: 1000, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0 }] });
 
         const res = await request(app).post('/api/expenses').send(VALID_BODY);
 
         expect(res.status).toBe(201);
-        const [, params] = mockExecute.mock.calls[0];
+        const [, params] = mockTxExec.mock.calls[0];
         expect(params).toMatchObject({ warehouse_id: 1, expense_date: '2026-09-01', transport_amount: 500, fuel_amount: 1000, labour_amount: 0, meals_amount: 0, other_amount: 0 });
     });
 
     it('returns 409 when an entry already exists for that warehouse and date', async () => {
-        mockExecute.mockRejectedValueOnce({ code: '23505' });
+        mockTxExec.mockRejectedValueOnce({ code: '23505' });
 
         const res = await request(app).post('/api/expenses').send(VALID_BODY);
 
@@ -62,7 +70,7 @@ describe('POST /api/expenses', () => {
 });
 
 describe('GET /api/expenses', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('filters by warehouse_id and date range', async () => {
         mockExecute.mockResolvedValueOnce({ rows: [] });
@@ -79,17 +87,16 @@ describe('GET /api/expenses', () => {
 });
 
 describe('PUT /api/expenses/:id', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('updates the given fields', async () => {
-        mockExecute
-            .mockResolvedValueOnce({ rows: [{ ID: 1 }] }) // existence check
-            .mockResolvedValueOnce({ rows: [{ ID: 1, TRANSPORT_AMOUNT: 750 }] }); // UPDATE
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1 }] }); // existence check
+        mockTxExec.mockResolvedValueOnce({ rows: [{ ID: 1, TRANSPORT_AMOUNT: 750 }] }); // UPDATE
 
         const res = await request(app).put('/api/expenses/1').send({ transport_amount: 750 });
 
         expect(res.status).toBe(200);
-        expect(mockExecute.mock.calls[1][0]).toMatch(/UPDATE warehouse_expenses SET transport_amount = :transport_amount, updated_at = now\(\)/);
+        expect(mockTxExec.mock.calls[0][0]).toMatch(/UPDATE warehouse_expenses SET transport_amount = :transport_amount, updated_at = now\(\)/);
     });
 
     it('returns 404 when the entry does not exist', async () => {
@@ -109,17 +116,16 @@ describe('PUT /api/expenses/:id', () => {
 });
 
 describe('DELETE /api/expenses/:id', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('deletes an existing entry', async () => {
-        mockExecute
-            .mockResolvedValueOnce({ rows: [{ ID: 1 }] })
-            .mockResolvedValueOnce({ rows: [] });
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1 }] }); // existence check
+        mockTxExec.mockResolvedValueOnce({ rows: [] }); // DELETE
 
         const res = await request(app).delete('/api/expenses/1');
 
         expect(res.status).toBe(200);
-        expect(mockExecute.mock.calls[1][0]).toMatch(/DELETE FROM warehouse_expenses/);
+        expect(mockTxExec.mock.calls[0][0]).toMatch(/DELETE FROM warehouse_expenses/);
     });
 
     it('returns 404 when the entry does not exist', async () => {
@@ -132,7 +138,7 @@ describe('DELETE /api/expenses/:id', () => {
 });
 
 describe('POST /api/expenses — warehouse scoping for warehouse_admin', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('rejects creating an entry for a warehouse outside the warehouse_admin\'s warehouse_ids', async () => {
         jest.resetModules();
@@ -164,7 +170,7 @@ describe('POST /api/expenses — warehouse scoping for warehouse_admin', () => {
 });
 
 describe('GET /api/expenses/summary', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('computes per-category variance against the prior month', async () => {
         mockExecute
@@ -209,7 +215,7 @@ describe('GET /api/expenses/summary', () => {
 });
 
 describe('GET /api/expenses/summary — warehouse scoping for warehouse_admin', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('scopes the summary to the warehouse_admin\'s own warehouse, ignoring a different warehouse_id in the query', async () => {
         jest.resetModules();
@@ -293,7 +299,7 @@ describe('GET /api/expenses/summary — warehouse scoping for warehouse_admin', 
 });
 
 describe('GET /api/expenses/comparison', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('returns one row per warehouse with its monthly total', async () => {
         mockExecute.mockResolvedValueOnce({ rows: [
@@ -312,7 +318,7 @@ describe('GET /api/expenses/comparison', () => {
 });
 
 describe('GET /api/expenses/comparison — warehouse scoping for warehouse_admin', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('scopes results to the warehouse_admin\'s own warehouse', async () => {
         jest.resetModules();
@@ -352,7 +358,7 @@ describe('GET /api/expenses/comparison — warehouse scoping for warehouse_admin
 });
 
 describe('GET /api/expenses — warehouse scoping for warehouse_admin', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('scopes results to the warehouse_admin\'s warehouse_ids', async () => {
         jest.resetModules();
@@ -392,18 +398,18 @@ describe('GET /api/expenses — warehouse scoping for warehouse_admin', () => {
 });
 
 describe('warehouse expense audit logging', () => {
-    beforeEach(() => { mockExecute.mockReset(); });
+    beforeEach(() => { mockExecute.mockReset(); mockTxExec.mockReset(); });
 
     it('createExpense logs a create row (before_value null, after_value the new row)', async () => {
         const INSERTED_ROW = { ID: 1, WAREHOUSE_ID: 1, EXPENSE_DATE: '2026-09-01', TRANSPORT_AMOUNT: 500, FUEL_AMOUNT: 1000, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0 };
-        mockExecute
+        mockTxExec
             .mockResolvedValueOnce({ rows: [INSERTED_ROW] }) // INSERT
             .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
 
         const res = await request(app).post('/api/expenses').send(VALID_BODY);
 
         expect(res.status).toBe(201);
-        const auditCall = mockExecute.mock.calls[1];
+        const auditCall = mockTxExec.mock.calls[1];
         expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
         expect(auditCall[1].action).toBe('create');
         expect(auditCall[1].before_value).toBeNull();
@@ -413,15 +419,15 @@ describe('warehouse expense audit logging', () => {
     it('updateExpense logs an update row (before_value the pre-edit row, after_value the post-edit row)', async () => {
         const BEFORE_ROW = { ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 500 };
         const AFTER_ROW = { ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 750 };
-        mockExecute
-            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // existence check
+        mockExecute.mockResolvedValueOnce({ rows: [BEFORE_ROW] }); // existence check
+        mockTxExec
             .mockResolvedValueOnce({ rows: [AFTER_ROW] }) // UPDATE
             .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
 
         const res = await request(app).put('/api/expenses/1').send({ transport_amount: 750 });
 
         expect(res.status).toBe(200);
-        const auditCall = mockExecute.mock.calls[2];
+        const auditCall = mockTxExec.mock.calls[1];
         expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
         expect(auditCall[1].action).toBe('update');
         expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
@@ -430,15 +436,15 @@ describe('warehouse expense audit logging', () => {
 
     it('deleteExpense logs a delete row (before_value the deleted row, after_value null)', async () => {
         const BEFORE_ROW = { ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 500 };
-        mockExecute
-            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // existence check
+        mockExecute.mockResolvedValueOnce({ rows: [BEFORE_ROW] }); // existence check
+        mockTxExec
             .mockResolvedValueOnce({ rows: [] }) // DELETE
             .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
 
         const res = await request(app).delete('/api/expenses/1');
 
         expect(res.status).toBe(200);
-        const auditCall = mockExecute.mock.calls[2];
+        const auditCall = mockTxExec.mock.calls[1];
         expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
         expect(auditCall[1].action).toBe('delete');
         expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
@@ -446,12 +452,16 @@ describe('warehouse expense audit logging', () => {
     });
 
     it('rolls back the insert if the audit insert fails (createExpense)', async () => {
-        mockExecute
+        mockTxExec
             .mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 500 }] }) // INSERT
             .mockRejectedValueOnce(new Error('audit insert failed'));
 
         const res = await request(app).post('/api/expenses').send(VALID_BODY);
 
         expect(res.status).toBe(500);
+        // Proves the INSERT and the audit log write both went through the transactional
+        // executor, not the bare module-level `execute` — a write on `execute` would commit
+        // outside the transaction and defeat the rollback this feature depends on.
+        expect(mockExecute).not.toHaveBeenCalled();
     });
 });
