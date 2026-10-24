@@ -13,7 +13,13 @@ jest.mock('../middleware/permissionMiddleware', () => ({
     requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
+jest.mock('../db/dbUtils', () => {
+    const execute = jest.fn();
+    return {
+        execute,
+        withTransaction: jest.fn(async (fn: any) => fn(execute)),
+    };
+});
 
 import payrollRoutes from '../routes/payrollRoutes';
 import { execute } from '../db/dbUtils';
@@ -166,13 +172,15 @@ describe('POST /api/payroll/:id/submit', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
     it('moves a draft to pending_approval', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'pending_approval' }] });
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'draft' }] }) // pre-fetch (before_value)
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'pending_approval' }] }); // update
 
         const res = await request(app).post('/api/payroll/1/submit');
 
         expect(res.status).toBe(200);
-        expect(mockExecute.mock.calls[0][0]).toMatch(/status = 'pending_approval'/);
-        expect(mockExecute.mock.calls[0][0]).toMatch(/status IN \('draft', 'rejected'\)/);
+        expect(mockExecute.mock.calls[1][0]).toMatch(/status = 'pending_approval'/);
+        expect(mockExecute.mock.calls[1][0]).toMatch(/status IN \('draft', 'rejected'\)/);
     });
 
     it('returns 404 when the record is not draft/rejected', async () => {
@@ -188,7 +196,9 @@ describe('POST /api/payroll/:id/approve', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
     it('approves a pending_approval record as system_admin', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'approved', APPROVED_BY: 1 }] });
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'pending_approval' }] }) // pre-fetch (before_value)
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'approved', APPROVED_BY: 1 }] }); // update
 
         const res = await request(app).post('/api/payroll/1/approve');
 
@@ -250,8 +260,13 @@ describe('POST /api/payroll/:id/reject', () => {
         }));
         jest.doMock('../db/dbUtils', () => {
             const execute = jest.fn();
-            execute.mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'rejected' }] });
-            return { execute };
+            execute
+                .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'pending_approval' }] }) // pre-fetch (before_value)
+                .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'rejected' }] }); // update
+            return {
+                execute,
+                withTransaction: jest.fn(async (fn: any) => fn(execute)),
+            };
         });
 
         const scopedRoutes = require('../routes/payrollRoutes').default;
@@ -327,6 +342,132 @@ describe('GET /api/payroll/report', () => {
         const [query, params] = mockExecute.mock.calls[0];
         expect(query).toMatch(/LEFT JOIN payroll p ON p\.warehouse_id = w\.id AND p\.status = 'approved'/);
         expect(params).toMatchObject({ year: 2026, month: 9 });
+    });
+});
+
+describe('payroll audit logging', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('createPayroll logs a create row with before_value null and after_value the new payroll row', async () => {
+        const INSERTED_ROW = { ID: 10, STAFF_ID: 1, BASIC_PAY: 30000, DEDUCTIONS: 2000, NET_SALARY: 28000, STATUS: 'draft' };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, BASIC_SALARY: 30000 }] }) // staff lookup
+            .mockResolvedValueOnce({ rows: [] }) // duplicate check
+            .mockResolvedValueOnce({ rows: [{ COUNT: 2 }] }) // absent days
+            .mockResolvedValueOnce({ rows: [INSERTED_ROW] }) // insert
+            .mockResolvedValueOnce({ rows: [] }); // audit_log insert
+
+        const res = await request(app).post('/api/payroll').send({ staff_id: 1, month: 9, year: 2026 });
+
+        expect(res.status).toBe(201);
+        const auditCall = mockExecute.mock.calls[4];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('create');
+        expect(auditCall[1].before_value).toBeNull();
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(INSERTED_ROW);
+    });
+
+    it('updatePayroll logs an update row with before_value the pre-edit row and after_value the post-edit row', async () => {
+        const EXISTING_ROW = { ID: 1, BASIC_PAY: 30000, OT_AMOUNT: 0, DEDUCTIONS: 2000, EPF_EMPLOYEE: 0, STATUS: 'draft' };
+        const UPDATED_ROW = { ID: 1, OT_AMOUNT: 1500, NET_SALARY: 29500 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [EXISTING_ROW] }) // existence+status check
+            .mockResolvedValueOnce({ rows: [UPDATED_ROW] }) // update
+            .mockResolvedValueOnce({ rows: [] }); // audit_log insert
+
+        const res = await request(app).put('/api/payroll/1').send({ ot_amount: 1500 });
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('update');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(EXISTING_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(UPDATED_ROW);
+    });
+
+    it('submitPayroll logs an update row (status draft/rejected -> pending_approval)', async () => {
+        const BEFORE_ROW = { ID: 1, STATUS: 'draft' };
+        const AFTER_ROW = { ID: 1, STATUS: 'pending_approval' };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // pre-fetch
+            .mockResolvedValueOnce({ rows: [AFTER_ROW] }) // update
+            .mockResolvedValueOnce({ rows: [] }); // audit_log insert
+
+        const res = await request(app).post('/api/payroll/1/submit');
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('update');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(AFTER_ROW);
+    });
+
+    it('approvePayroll logs an update row (status pending_approval -> approved)', async () => {
+        const BEFORE_ROW = { ID: 1, STATUS: 'pending_approval' };
+        const AFTER_ROW = { ID: 1, STATUS: 'approved', APPROVED_BY: 1 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // pre-fetch
+            .mockResolvedValueOnce({ rows: [AFTER_ROW] }) // update
+            .mockResolvedValueOnce({ rows: [] }); // audit_log insert
+
+        const res = await request(app).post('/api/payroll/1/approve');
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('update');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(AFTER_ROW);
+    });
+
+    it('rejectPayroll logs an update row (status pending_approval -> rejected)', async () => {
+        const BEFORE_ROW = { ID: 1, STATUS: 'pending_approval' };
+        const AFTER_ROW = { ID: 1, STATUS: 'rejected' };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // pre-fetch
+            .mockResolvedValueOnce({ rows: [AFTER_ROW] }) // update
+            .mockResolvedValueOnce({ rows: [] }); // audit_log insert
+
+        const res = await request(app).post('/api/payroll/1/reject');
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('update');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(AFTER_ROW);
+    });
+
+    it('reversePayroll logs a reverse row with before_value the original (unchanged) and after_value the new reversal row', async () => {
+        const ORIGINAL_ROW = { ID: 5, STAFF_ID: 1, WAREHOUSE_ID: 1, MONTH: 9, YEAR: 2026, BASIC_PAY: 30000, OT_AMOUNT: 1500, DEDUCTIONS: 2000, EPF_EMPLOYEE: 2400, EPF_EMPLOYER: 3600, ETF: 900, NET_SALARY: 27100 };
+        const REVERSAL_ROW = { ID: 6, REVERSES_PAYROLL_ID: 5, NET_SALARY: -27100 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [ORIGINAL_ROW] }) // original select
+            .mockResolvedValueOnce({ rows: [REVERSAL_ROW] }) // insert
+            .mockResolvedValueOnce({ rows: [] }); // audit_log insert
+
+        const res = await request(app).post('/api/payroll/5/reverse');
+
+        expect(res.status).toBe(201);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('reverse');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(ORIGINAL_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(REVERSAL_ROW);
+    });
+
+    it('rolls back the primary write if the audit insert fails (createPayroll)', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, BASIC_SALARY: 30000 }] }) // staff lookup
+            .mockResolvedValueOnce({ rows: [] }) // duplicate check
+            .mockResolvedValueOnce({ rows: [{ COUNT: 2 }] }) // absent days
+            .mockResolvedValueOnce({ rows: [{ ID: 10, STAFF_ID: 1, BASIC_PAY: 30000, DEDUCTIONS: 2000, NET_SALARY: 28000, STATUS: 'draft' }] }) // insert
+            .mockRejectedValueOnce(new Error('audit insert failed'));
+
+        const res = await request(app).post('/api/payroll').send({ staff_id: 1, month: 9, year: 2026 });
+
+        expect(res.status).toBe(500);
     });
 });
 

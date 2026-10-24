@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { execute } from '../db/dbUtils';
+import { execute, withTransaction } from '../db/dbUtils';
+import { logAudit } from '../utils/auditLog';
 
 function warehouseScope(req: Request): number[] | null {
     const user = (req as any).user;
@@ -56,17 +57,22 @@ export const createPayroll = async (req: Request, res: Response) => {
         const deductions = (basicPay / 30) * absentDays;
         const netSalary = basicPay - deductions;
 
-        const result = await execute<any>(
-            `INSERT INTO payroll (staff_id, warehouse_id, month, year, basic_pay, deductions, net_salary, created_by)
-             VALUES (:staff_id, :warehouse_id, :month, :year, :basic_pay, :deductions, :net_salary, :created_by)
-             RETURNING *`,
-            {
-                staff_id, warehouse_id: staff.WAREHOUSE_ID, month, year,
-                basic_pay: basicPay, deductions, net_salary: netSalary,
-                created_by: (req as any).user?.id ?? null,
-            }
-        );
-        res.status(201).json(result.rows[0]);
+        const userId = (req as any).user?.id ?? null;
+        const insertedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `INSERT INTO payroll (staff_id, warehouse_id, month, year, basic_pay, deductions, net_salary, created_by)
+                 VALUES (:staff_id, :warehouse_id, :month, :year, :basic_pay, :deductions, :net_salary, :created_by)
+                 RETURNING *`,
+                {
+                    staff_id, warehouse_id: staff.WAREHOUSE_ID, month, year,
+                    basic_pay: basicPay, deductions, net_salary: netSalary,
+                    created_by: userId,
+                }
+            );
+            await logAudit(exec, 'payroll', result.rows[0].ID, 'create', userId, null, result.rows[0]);
+            return result.rows[0];
+        });
+        res.status(201).json(insertedRow);
     } catch (err: any) {
         if (err.code === '23505') {
             return res.status(409).json({ message: 'A payroll record already exists for this staff member and period' });
@@ -131,11 +137,19 @@ export const updatePayroll = async (req: Request, res: Response) => {
         }
         updateQuery += ` RETURNING *`;
 
-        const result = await execute<any>(updateQuery, updateParams);
-        if (result.rows.length === 0) {
+        const userId = (req as any).user?.id ?? null;
+        const updatedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(updateQuery, updateParams);
+            if (result.rows.length === 0) {
+                return null;
+            }
+            await logAudit(exec, 'payroll', result.rows[0].ID, 'update', userId, existing, result.rows[0]);
+            return result.rows[0];
+        });
+        if (!updatedRow) {
             return res.status(404).json({ message: 'Payroll record not found' });
         }
-        res.json(result.rows[0]);
+        res.json(updatedRow);
     } catch (err) {
         console.error('updatePayroll error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -145,6 +159,7 @@ export const updatePayroll = async (req: Request, res: Response) => {
 export const submitPayroll = async (req: Request, res: Response) => {
     const { id } = req.params;
     const scope = warehouseScope(req);
+    const userId = (req as any).user?.id ?? null;
     try {
         let query = `UPDATE payroll SET status = 'pending_approval', updated_at = now() WHERE id = :id AND status IN ('draft', 'rejected')`;
         const params: any = { id };
@@ -153,11 +168,31 @@ export const submitPayroll = async (req: Request, res: Response) => {
             params.warehouse_ids = scope;
         }
         query += ` RETURNING *`;
-        const result = await execute<any>(query, params);
-        if (result.rows.length === 0) {
+
+        const updatedRow = await withTransaction(async (exec) => {
+            let beforeQuery = `SELECT * FROM payroll WHERE id = :id`;
+            const beforeParams: any = { id };
+            if (scope !== null) {
+                beforeQuery += ` AND warehouse_id = ANY(:warehouse_ids)`;
+                beforeParams.warehouse_ids = scope;
+            }
+            const beforeResult = await exec<any>(beforeQuery, beforeParams);
+            if (beforeResult.rows.length === 0) {
+                return null;
+            }
+            const before = beforeResult.rows[0];
+
+            const result = await exec<any>(query, params);
+            if (result.rows.length === 0) {
+                return null;
+            }
+            await logAudit(exec, 'payroll', result.rows[0].ID, 'update', userId, before, result.rows[0]);
+            return result.rows[0];
+        });
+        if (!updatedRow) {
             return res.status(404).json({ message: 'Payroll record not found' });
         }
-        res.json(result.rows[0]);
+        res.json(updatedRow);
     } catch (err) {
         console.error('submitPayroll error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -171,15 +206,28 @@ export const approvePayroll = async (req: Request, res: Response) => {
     const { id } = req.params;
     const userId = (req as any).user?.id ?? null;
     try {
-        const result = await execute<any>(
-            `UPDATE payroll SET status = 'approved', approved_by = :approved_by, updated_at = now()
-             WHERE id = :id AND status = 'pending_approval' RETURNING *`,
-            { id, approved_by: userId }
-        );
-        if (result.rows.length === 0) {
+        const updatedRow = await withTransaction(async (exec) => {
+            const beforeResult = await exec<any>(`SELECT * FROM payroll WHERE id = :id`, { id });
+            if (beforeResult.rows.length === 0) {
+                return null;
+            }
+            const before = beforeResult.rows[0];
+
+            const result = await exec<any>(
+                `UPDATE payroll SET status = 'approved', approved_by = :approved_by, updated_at = now()
+                 WHERE id = :id AND status = 'pending_approval' RETURNING *`,
+                { id, approved_by: userId }
+            );
+            if (result.rows.length === 0) {
+                return null;
+            }
+            await logAudit(exec, 'payroll', result.rows[0].ID, 'update', userId, before, result.rows[0]);
+            return result.rows[0];
+        });
+        if (!updatedRow) {
             return res.status(404).json({ message: 'Payroll record not found or not pending approval' });
         }
-        res.json(result.rows[0]);
+        res.json(updatedRow);
     } catch (err) {
         console.error('approvePayroll error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -191,16 +239,30 @@ export const rejectPayroll = async (req: Request, res: Response) => {
         return res.status(403).json({ message: 'Only system_admin or finance_officer may reject payroll' });
     }
     const { id } = req.params;
+    const userId = (req as any).user?.id ?? null;
     try {
-        const result = await execute<any>(
-            `UPDATE payroll SET status = 'rejected', updated_at = now()
-             WHERE id = :id AND status = 'pending_approval' RETURNING *`,
-            { id }
-        );
-        if (result.rows.length === 0) {
+        const updatedRow = await withTransaction(async (exec) => {
+            const beforeResult = await exec<any>(`SELECT * FROM payroll WHERE id = :id`, { id });
+            if (beforeResult.rows.length === 0) {
+                return null;
+            }
+            const before = beforeResult.rows[0];
+
+            const result = await exec<any>(
+                `UPDATE payroll SET status = 'rejected', updated_at = now()
+                 WHERE id = :id AND status = 'pending_approval' RETURNING *`,
+                { id }
+            );
+            if (result.rows.length === 0) {
+                return null;
+            }
+            await logAudit(exec, 'payroll', result.rows[0].ID, 'update', userId, before, result.rows[0]);
+            return result.rows[0];
+        });
+        if (!updatedRow) {
             return res.status(404).json({ message: 'Payroll record not found or not pending approval' });
         }
-        res.json(result.rows[0]);
+        res.json(updatedRow);
     } catch (err) {
         console.error('rejectPayroll error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -223,30 +285,34 @@ export const reversePayroll = async (req: Request, res: Response) => {
         }
         const original = originalResult.rows[0];
 
-        const result = await execute<any>(
-            `INSERT INTO payroll
-                (staff_id, warehouse_id, month, year, basic_pay, ot_amount, deductions, epf_employee, epf_employer, etf, net_salary, status, reverses_payroll_id, created_by, approved_by)
-             VALUES
-                (:staff_id, :warehouse_id, :month, :year, :basic_pay, :ot_amount, :deductions, :epf_employee, :epf_employer, :etf, :net_salary, 'approved', :reverses_payroll_id, :created_by, :approved_by)
-             RETURNING *`,
-            {
-                staff_id: original.STAFF_ID,
-                warehouse_id: original.WAREHOUSE_ID,
-                month: original.MONTH,
-                year: original.YEAR,
-                basic_pay: -original.BASIC_PAY,
-                ot_amount: -original.OT_AMOUNT,
-                deductions: -original.DEDUCTIONS,
-                epf_employee: -original.EPF_EMPLOYEE,
-                epf_employer: -original.EPF_EMPLOYER,
-                etf: -original.ETF,
-                net_salary: -original.NET_SALARY,
-                reverses_payroll_id: original.ID,
-                created_by: userId,
-                approved_by: userId,
-            }
-        );
-        res.status(201).json(result.rows[0]);
+        const reversalRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `INSERT INTO payroll
+                    (staff_id, warehouse_id, month, year, basic_pay, ot_amount, deductions, epf_employee, epf_employer, etf, net_salary, status, reverses_payroll_id, created_by, approved_by)
+                 VALUES
+                    (:staff_id, :warehouse_id, :month, :year, :basic_pay, :ot_amount, :deductions, :epf_employee, :epf_employer, :etf, :net_salary, 'approved', :reverses_payroll_id, :created_by, :approved_by)
+                 RETURNING *`,
+                {
+                    staff_id: original.STAFF_ID,
+                    warehouse_id: original.WAREHOUSE_ID,
+                    month: original.MONTH,
+                    year: original.YEAR,
+                    basic_pay: -original.BASIC_PAY,
+                    ot_amount: -original.OT_AMOUNT,
+                    deductions: -original.DEDUCTIONS,
+                    epf_employee: -original.EPF_EMPLOYEE,
+                    epf_employer: -original.EPF_EMPLOYER,
+                    etf: -original.ETF,
+                    net_salary: -original.NET_SALARY,
+                    reverses_payroll_id: original.ID,
+                    created_by: userId,
+                    approved_by: userId,
+                }
+            );
+            await logAudit(exec, 'payroll', result.rows[0].ID, 'reverse', userId, original, result.rows[0]);
+            return result.rows[0];
+        });
+        res.status(201).json(reversalRow);
     } catch (err: any) {
         if (err.code === '23505') {
             return res.status(409).json({ message: 'This payroll record has already been reversed' });
