@@ -4,6 +4,7 @@ import { Pencil, Check, X } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { Warehouse, Staff as StaffMember } from '../types';
+import { PageHeader, Card, Table, Td, Tr, Badge, Button } from '../components/ui';
 
 function todayISO(): string {
     return new Date().toISOString().slice(0, 10);
@@ -114,20 +115,22 @@ const Staff: React.FC = () => {
     if (!canManageStaff) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
 
+    const headers = ['Name', 'NIC', ...(!isScoped ? ['Warehouse'] : []), 'Designation', 'Join Date', 'Basic Salary', 'EPF No.', 'Status', 'Actions'];
+
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-slate-800">Staff</h1>
-                <button
-                    onClick={() => setShowCreateForm(!showCreateForm)}
-                    className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700"
-                >
-                    {showCreateForm ? 'Cancel' : 'New Staff Member'}
-                </button>
-            </div>
+            <PageHeader
+                title="Staff"
+                action={
+                    <Button onClick={() => setShowCreateForm(!showCreateForm)}>
+                        {showCreateForm ? 'Cancel' : 'New Staff Member'}
+                    </Button>
+                }
+            />
 
             {showCreateForm && (
-                <form onSubmit={handleCreate} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3 items-end">
+                <Card>
+                    <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
                     {selectableWarehouses.length > 1 && (
                         <div>
                             <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
@@ -163,78 +166,62 @@ const Staff: React.FC = () => {
                         <label className="block text-sm font-medium text-slate-600 mb-1">EPF No.</label>
                         <input className="border border-slate-300 rounded-lg px-3 py-2" value={epfNo} onChange={(e) => setEpfNo(e.target.value)} />
                     </div>
-                    <button type="submit" disabled={submitting || !formWarehouseId} className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                    <Button type="submit" disabled={submitting || !formWarehouseId}>
                         {submitting ? 'Saving...' : 'Save'}
-                    </button>
-                </form>
+                    </Button>
+                    </form>
+                </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                        <tr>
-                            <th className="p-3">Name</th>
-                            <th className="p-3">NIC</th>
-                            {!isScoped && <th className="p-3">Warehouse</th>}
-                            <th className="p-3">Designation</th>
-                            <th className="p-3">Join Date</th>
-                            <th className="p-3">Basic Salary</th>
-                            <th className="p-3">EPF No.</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {staffList.map((s) =>
-                            editingId === s.ID ? (
-                                <tr key={s.ID} className="border-t border-slate-100 bg-slate-50">
-                                    <td className="p-2">
-                                        <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                                    </td>
-                                    <td className="p-3">{s.NIC}</td>
-                                    {!isScoped && <td className="p-3">{s.WAREHOUSE_NAME}</td>}
-                                    <td className="p-2">
-                                        <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editDesignation} onChange={(e) => setEditDesignation(e.target.value)} />
-                                    </td>
-                                    <td className="p-3">{s.JOIN_DATE}</td>
-                                    <td className="p-2">
-                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editBasicSalary} onChange={(e) => setEditBasicSalary(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editEpfNo} onChange={(e) => setEditEpfNo(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <select className="border border-slate-300 rounded px-2 py-1" value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive')}>
-                                            <option value="active">Active</option>
-                                            <option value="inactive">Inactive</option>
-                                        </select>
-                                    </td>
-                                    <td className="p-2">
-                                        <div className="flex gap-2">
-                                            <button onClick={() => saveEdit(s.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
-                                            <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                <tr key={s.ID} className="border-t border-slate-100">
-                                    <td className="p-3">{s.NAME}</td>
-                                    <td className="p-3">{s.NIC}</td>
-                                    {!isScoped && <td className="p-3">{s.WAREHOUSE_NAME}</td>}
-                                    <td className="p-3">{s.DESIGNATION}</td>
-                                    <td className="p-3">{s.JOIN_DATE}</td>
-                                    <td className="p-3">{s.BASIC_SALARY.toFixed(2)}</td>
-                                    <td className="p-3">{s.EPF_NO}</td>
-                                    <td className="p-3 capitalize">{s.STATUS}</td>
-                                    <td className="p-3">
-                                        <button onClick={() => startEdit(s)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
-                                    </td>
-                                </tr>
-                            )
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <Table headers={headers} empty={staffList.length === 0}>
+                {staffList.map((s) =>
+                    editingId === s.ID ? (
+                        <Tr key={s.ID} className="bg-slate-50">
+                            <Td>
+                                <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                            </Td>
+                            <Td>{s.NIC}</Td>
+                            {!isScoped && <Td>{s.WAREHOUSE_NAME}</Td>}
+                            <Td>
+                                <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editDesignation} onChange={(e) => setEditDesignation(e.target.value)} />
+                            </Td>
+                            <Td>{s.JOIN_DATE}</Td>
+                            <Td>
+                                <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editBasicSalary} onChange={(e) => setEditBasicSalary(e.target.value)} />
+                            </Td>
+                            <Td>
+                                <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editEpfNo} onChange={(e) => setEditEpfNo(e.target.value)} />
+                            </Td>
+                            <Td>
+                                <select className="border border-slate-300 rounded px-2 py-1" value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive')}>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </Td>
+                            <Td>
+                                <div className="flex gap-2">
+                                    <button onClick={() => saveEdit(s.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
+                                    <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
+                                </div>
+                            </Td>
+                        </Tr>
+                    ) : (
+                        <Tr key={s.ID}>
+                            <Td>{s.NAME}</Td>
+                            <Td>{s.NIC}</Td>
+                            {!isScoped && <Td>{s.WAREHOUSE_NAME}</Td>}
+                            <Td>{s.DESIGNATION}</Td>
+                            <Td>{s.JOIN_DATE}</Td>
+                            <Td>{s.BASIC_SALARY.toFixed(2)}</Td>
+                            <Td>{s.EPF_NO}</Td>
+                            <Td><Badge tone={s.STATUS === 'active' ? 'success' : 'neutral'}>{s.STATUS}</Badge></Td>
+                            <Td>
+                                <button onClick={() => startEdit(s)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                            </Td>
+                        </Tr>
+                    )
+                )}
+            </Table>
         </div>
     );
 };
