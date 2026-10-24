@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { AppUser, PermissionKey, UserRole, Warehouse } from '../types';
+import { PageHeader, Card, Table, Td, Tr, Badge, Button } from '../components/ui';
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
     { value: 'system_admin', label: 'System Admin' },
@@ -131,149 +132,138 @@ const Users: React.FC = () => {
     if (!canManageUsers) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
 
+    const headers = ['Username', 'Name', 'Role', 'Warehouses', 'Status', 'Actions'];
+
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-slate-800">Users</h1>
-                <button
-                    onClick={() => setShowCreateForm(!showCreateForm)}
-                    className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700"
-                >
-                    {showCreateForm ? 'Cancel' : 'New User'}
-                </button>
-            </div>
+            <PageHeader
+                title="Users"
+                action={
+                    <Button onClick={() => setShowCreateForm(!showCreateForm)}>
+                        {showCreateForm ? 'Cancel' : 'New User'}
+                    </Button>
+                }
+            />
 
             {showCreateForm && (
-                <form onSubmit={handleCreate} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3 items-end">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Username</label>
-                        <input className="border border-slate-300 rounded-lg px-3 py-2" value={username} onChange={(e) => setUsername(e.target.value)} required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Name</label>
-                        <input className="border border-slate-300 rounded-lg px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Password</label>
-                        <input type="password" className="border border-slate-300 rounded-lg px-3 py-2" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Role</label>
-                        <select className="border border-slate-300 rounded-lg px-3 py-2" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-                            {ROLE_OPTIONS.map((r) => (
-                                <option key={r.value} value={r.value}>{r.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    {role === 'warehouse_admin' && (
+                <Card>
+                    <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
                         <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Warehouses</label>
-                            <select
-                                multiple
-                                className="border border-slate-300 rounded-lg px-3 py-2 h-20"
-                                value={warehouseIds.map(String)}
-                                onChange={(e) => setWarehouseIds(Array.from(e.target.selectedOptions).map((o) => Number(o.value)))}
-                            >
-                                {warehouses.map((w) => (
-                                    <option key={w.ID} value={w.ID}>{w.NAME}</option>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Username</label>
+                            <input className="border border-slate-300 rounded-lg px-3 py-2" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Name</label>
+                            <input className="border border-slate-300 rounded-lg px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Password</label>
+                            <input type="password" className="border border-slate-300 rounded-lg px-3 py-2" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Role</label>
+                            <select className="border border-slate-300 rounded-lg px-3 py-2" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+                                {ROLE_OPTIONS.map((r) => (
+                                    <option key={r.value} value={r.value}>{r.label}</option>
                                 ))}
                             </select>
                         </div>
-                    )}
-                    <button type="submit" className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700">
-                        Save
-                    </button>
-                </form>
+                        {role === 'warehouse_admin' && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Warehouses</label>
+                                <select
+                                    multiple
+                                    className="border border-slate-300 rounded-lg px-3 py-2 h-20"
+                                    value={warehouseIds.map(String)}
+                                    onChange={(e) => setWarehouseIds(Array.from(e.target.selectedOptions).map((o) => Number(o.value)))}
+                                >
+                                    {warehouses.map((w) => (
+                                        <option key={w.ID} value={w.ID}>{w.NAME}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <Button type="submit">
+                            Save
+                        </Button>
+                    </form>
+                </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                        <tr>
-                            <th className="p-3">Username</th>
-                            <th className="p-3">Name</th>
-                            <th className="p-3">Role</th>
-                            <th className="p-3">Warehouses</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {users.map((u) =>
-                            editingId === u.ID ? (
-                                <tr key={u.ID} className="border-t border-slate-100 bg-slate-50 align-top">
-                                    <td className="p-3">{u.USERNAME}</td>
-                                    <td className="p-2">
-                                        <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <select className="border border-slate-300 rounded px-2 py-1" value={editRole} onChange={(e) => setEditRole(e.target.value as UserRole)}>
-                                            {ROLE_OPTIONS.map((r) => (
-                                                <option key={r.value} value={r.value}>{r.label}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="p-2">
-                                        {editRole === 'warehouse_admin' ? (
-                                            <div className="flex flex-col gap-1">
-                                                {warehouses.map((w) => (
-                                                    <label key={w.ID} className="flex items-center gap-1 text-xs">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={editWarehouseIds.includes(w.ID)}
-                                                            onChange={() => toggleEditWarehouse(w.ID)}
-                                                        />
-                                                        {w.NAME}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span className="text-xs text-slate-400">All</span>
-                                        )}
-                                    </td>
-                                    <td className="p-2">
-                                        <select className="border border-slate-300 rounded px-2 py-1" value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive')}>
-                                            <option value="active">Active</option>
-                                            <option value="inactive">Inactive</option>
-                                        </select>
-                                    </td>
-                                    <td className="p-2">
-                                        <div className="flex flex-col gap-2">
-                                            <input type="password" placeholder="New password (optional)" className="border border-slate-300 rounded px-2 py-1 text-xs" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} minLength={6} />
-                                            <div className="flex gap-2">
-                                                <button onClick={() => saveEdit(u.ID)} className="text-green-600 hover:text-green-700 text-xs font-medium">Save</button>
-                                                <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600 text-xs font-medium">Cancel</button>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                <tr key={u.ID} className="border-t border-slate-100">
-                                    <td className="p-3">{u.USERNAME}</td>
-                                    <td className="p-3">{u.NAME}</td>
-                                    <td className="p-3">{ROLE_OPTIONS.find((r) => r.value === u.ROLE)?.label ?? u.ROLE}</td>
-                                    <td className="p-3">{(u.WAREHOUSE_IDS || []).map((id) => warehouses.find((w) => w.ID === id)?.NAME || id).join(', ')}</td>
-                                    <td className="p-3 capitalize">{u.STATUS}</td>
-                                    <td className="p-3">
-                                        <button onClick={() => startEdit(u)} className="text-blue-600 hover:text-blue-700 text-xs font-medium">Edit</button>
-                                    </td>
-                                </tr>
-                            )
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <Table headers={headers} empty={users.length === 0}>
+                {users.map((u) =>
+                    editingId === u.ID ? (
+                        <Tr key={u.ID} className="bg-slate-50 align-top">
+                            <Td>{u.USERNAME}</Td>
+                            <Td>
+                                <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                            </Td>
+                            <Td>
+                                <select className="border border-slate-300 rounded px-2 py-1" value={editRole} onChange={(e) => setEditRole(e.target.value as UserRole)}>
+                                    {ROLE_OPTIONS.map((r) => (
+                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                </select>
+                            </Td>
+                            <Td>
+                                {editRole === 'warehouse_admin' ? (
+                                    <div className="flex flex-col gap-1">
+                                        {warehouses.map((w) => (
+                                            <label key={w.ID} className="flex items-center gap-1 text-xs">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={editWarehouseIds.includes(w.ID)}
+                                                    onChange={() => toggleEditWarehouse(w.ID)}
+                                                />
+                                                {w.NAME}
+                                            </label>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <span className="text-xs text-slate-400">All</span>
+                                )}
+                            </Td>
+                            <Td>
+                                <select className="border border-slate-300 rounded px-2 py-1" value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'active' | 'inactive')}>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </Td>
+                            <Td>
+                                <div className="flex flex-col gap-2">
+                                    <input type="password" placeholder="New password (optional)" className="border border-slate-300 rounded px-2 py-1 text-xs" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} minLength={6} />
+                                    <div className="flex gap-2">
+                                        <button onClick={() => saveEdit(u.ID)} className="text-green-600 hover:text-green-700 text-xs font-medium">Save</button>
+                                        <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600 text-xs font-medium">Cancel</button>
+                                    </div>
+                                </div>
+                            </Td>
+                        </Tr>
+                    ) : (
+                        <Tr key={u.ID}>
+                            <Td>{u.USERNAME}</Td>
+                            <Td>{u.NAME}</Td>
+                            <Td>{ROLE_OPTIONS.find((r) => r.value === u.ROLE)?.label ?? u.ROLE}</Td>
+                            <Td>{(u.WAREHOUSE_IDS || []).map((id) => warehouses.find((w) => w.ID === id)?.NAME || id).join(', ')}</Td>
+                            <Td><Badge tone={u.STATUS === 'active' ? 'success' : 'neutral'}>{u.STATUS}</Badge></Td>
+                            <Td>
+                                <button onClick={() => startEdit(u)} className="text-blue-600 hover:text-blue-700 text-xs font-medium">Edit</button>
+                            </Td>
+                        </Tr>
+                    )
+                )}
+            </Table>
 
             {editingId !== null && (
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <Card>
                     <h2 className="text-sm font-semibold text-slate-700 mb-3">Permission Overrides</h2>
                     <table className="w-full text-sm">
-                        <thead className="text-left text-slate-500">
+                        <thead className="text-left text-slate-400">
                             <tr>
-                                <th className="p-2">Permission</th>
-                                <th className="p-2">Default</th>
-                                <th className="p-2">Always Allow</th>
-                                <th className="p-2">Always Deny</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Permission</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Default</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Always Allow</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Always Deny</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -294,7 +284,7 @@ const Users: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                </Card>
             )}
         </div>
     );
