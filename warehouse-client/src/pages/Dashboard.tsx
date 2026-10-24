@@ -20,17 +20,21 @@ const EVENT_LABEL: Record<string, string> = {
     disposed: 'Disposed',
 };
 
+function ymd(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function monthRange(): { from: string; to: string } {
     const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const from = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+    const to = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     return { from, to };
 }
 
 function last6MonthsRange(): { from: string; to: string } {
     const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const from = ymd(new Date(now.getFullYear(), now.getMonth() - 5, 1));
+    const to = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     return { from, to };
 }
 
