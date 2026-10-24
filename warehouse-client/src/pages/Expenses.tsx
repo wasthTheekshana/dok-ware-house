@@ -4,6 +4,7 @@ import { Pencil, Check, X } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { Warehouse, WarehouseExpense, ExpenseSummary, ExpenseComparisonRow } from '../types';
+import { PageHeader, Card, Table, Td, Tr, Button } from '../components/ui';
 
 const CATEGORY_FIELDS = [
     { key: 'transport_amount', label: 'Transport/Parking' },
@@ -177,47 +178,51 @@ const Expenses: React.FC = () => {
     if (!canManageExpenses) return <div className="text-slate-500">You don't have access to this page.</div>;
     if (loading) return <div>Loading...</div>;
 
+    const headers = ['Date', ...(!isScoped ? ['Warehouse'] : []), ...CATEGORY_FIELDS.map((f) => f.label), 'Remarks', 'Actions'];
+
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">Warehouse Expenses</h1>
+            <PageHeader title="Warehouse Expenses" />
 
-            <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                    {selectableWarehouses.length > 1 && (
+            <Card>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                        {selectableWarehouses.length > 1 && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
+                                <select className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formWarehouseId} onChange={(e) => setFormWarehouseId(e.target.value)} required>
+                                    <option value="">Select...</option>
+                                    {selectableWarehouses.map((w) => (
+                                        <option key={w.ID} value={w.ID}>{w.NAME}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
-                            <select className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formWarehouseId} onChange={(e) => setFormWarehouseId(e.target.value)} required>
-                                <option value="">Select...</option>
-                                {selectableWarehouses.map((w) => (
-                                    <option key={w.ID} value={w.ID}>{w.NAME}</option>
-                                ))}
-                            </select>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Date</label>
+                            <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formDate} onChange={(e) => setFormDate(e.target.value)} required />
                         </div>
-                    )}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Date</label>
-                        <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formDate} onChange={(e) => setFormDate(e.target.value)} required />
                     </div>
-                </div>
-                <div className="grid grid-cols-5 gap-3">
-                    {CATEGORY_FIELDS.map(({ key, label }) => (
-                        <div key={key}>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">{label}</label>
-                            <input type="number" min="0" step="0.01" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formAmounts[key]} onChange={(e) => setFormAmounts((prev) => ({ ...prev, [key]: e.target.value }))} />
-                        </div>
-                    ))}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-600 mb-1">Remarks</label>
-                    <input className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formRemarks} onChange={(e) => setFormRemarks(e.target.value)} />
-                </div>
-                <button type="submit" disabled={submitting || !formWarehouseId} className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                    {submitting ? 'Saving...' : existingEntryId ? 'Update Entry' : 'Save Entry'}
-                </button>
-            </form>
+                    <div className="grid grid-cols-5 gap-3">
+                        {CATEGORY_FIELDS.map(({ key, label }) => (
+                            <div key={key}>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">{label}</label>
+                                <input type="number" min="0" step="0.01" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formAmounts[key]} onChange={(e) => setFormAmounts((prev) => ({ ...prev, [key]: e.target.value }))} />
+                            </div>
+                        ))}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 mb-1">Remarks</label>
+                        <input className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={formRemarks} onChange={(e) => setFormRemarks(e.target.value)} />
+                    </div>
+                    <Button type="submit" disabled={submitting || !formWarehouseId}>
+                        {submitting ? 'Saving...' : existingEntryId ? 'Update Entry' : 'Save Entry'}
+                    </Button>
+                </form>
+            </Card>
 
             {summary && (
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <Card>
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-semibold text-slate-700">Monthly Summary</h2>
                         <div className="flex gap-2">
@@ -230,11 +235,11 @@ const Expenses: React.FC = () => {
                         </div>
                     </div>
                     <table className="w-full text-sm">
-                        <thead className="text-left text-slate-500">
+                        <thead className="text-left text-slate-400">
                             <tr>
-                                <th className="p-2">Category</th>
-                                <th className="p-2">This Month</th>
-                                <th className="p-2">Variance</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Category</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">This Month</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Variance</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -257,17 +262,17 @@ const Expenses: React.FC = () => {
                             })}
                         </tbody>
                     </table>
-                </div>
+                </Card>
             )}
 
             {!isScoped && comparison.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <Card>
                     <h2 className="text-sm font-semibold text-slate-700 mb-3">Cross-Warehouse Comparison</h2>
                     <table className="w-full text-sm">
-                        <thead className="text-left text-slate-500">
+                        <thead className="text-left text-slate-400">
                             <tr>
-                                <th className="p-2">Warehouse</th>
-                                <th className="p-2">Total</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Warehouse</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -279,62 +284,47 @@ const Expenses: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                        <tr>
-                            <th className="p-3">Date</th>
-                            {!isScoped && <th className="p-3">Warehouse</th>}
-                            {CATEGORY_FIELDS.map(({ key, label }) => (
-                                <th key={key} className="p-3">{label}</th>
+            <Table headers={headers} empty={entries.length === 0}>
+                {entries.map((entry) =>
+                    editingId === entry.ID ? (
+                        <Tr key={entry.ID} className="bg-slate-50">
+                            <Td>{entry.EXPENSE_DATE}</Td>
+                            {!isScoped && <Td>{entry.WAREHOUSE_NAME}</Td>}
+                            {CATEGORY_FIELDS.map(({ key }) => (
+                                <Td key={key}>
+                                    <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editAmounts[key]} onChange={(e) => setEditAmounts((prev) => ({ ...prev, [key]: e.target.value }))} />
+                                </Td>
                             ))}
-                            <th className="p-3">Remarks</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {entries.map((entry) =>
-                            editingId === entry.ID ? (
-                                <tr key={entry.ID} className="border-t border-slate-100 bg-slate-50">
-                                    <td className="p-3">{entry.EXPENSE_DATE}</td>
-                                    {!isScoped && <td className="p-3">{entry.WAREHOUSE_NAME}</td>}
-                                    {CATEGORY_FIELDS.map(({ key }) => (
-                                        <td key={key} className="p-2">
-                                            <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editAmounts[key]} onChange={(e) => setEditAmounts((prev) => ({ ...prev, [key]: e.target.value }))} />
-                                        </td>
-                                    ))}
-                                    <td className="p-2">
-                                        <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editRemarks} onChange={(e) => setEditRemarks(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <div className="flex gap-2">
-                                            <button onClick={() => saveEdit(entry.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
-                                            <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                <tr key={entry.ID} className="border-t border-slate-100">
-                                    <td className="p-3">{entry.EXPENSE_DATE}</td>
-                                    {!isScoped && <td className="p-3">{entry.WAREHOUSE_NAME}</td>}
-                                    <td className="p-3">{entry.TRANSPORT_AMOUNT.toFixed(2)}</td>
-                                    <td className="p-3">{entry.FUEL_AMOUNT.toFixed(2)}</td>
-                                    <td className="p-3">{entry.LABOUR_AMOUNT.toFixed(2)}</td>
-                                    <td className="p-3">{entry.MEALS_AMOUNT.toFixed(2)}</td>
-                                    <td className="p-3">{entry.OTHER_AMOUNT.toFixed(2)}</td>
-                                    <td className="p-3">{entry.REMARKS}</td>
-                                    <td className="p-3">
-                                        <button onClick={() => startEdit(entry)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
-                                    </td>
-                                </tr>
-                            )
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            <Td>
+                                <input className="border border-slate-300 rounded px-2 py-1 w-full" value={editRemarks} onChange={(e) => setEditRemarks(e.target.value)} />
+                            </Td>
+                            <Td>
+                                <div className="flex gap-2">
+                                    <button onClick={() => saveEdit(entry.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
+                                    <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
+                                </div>
+                            </Td>
+                        </Tr>
+                    ) : (
+                        <Tr key={entry.ID}>
+                            <Td>{entry.EXPENSE_DATE}</Td>
+                            {!isScoped && <Td>{entry.WAREHOUSE_NAME}</Td>}
+                            <Td>{entry.TRANSPORT_AMOUNT.toFixed(2)}</Td>
+                            <Td>{entry.FUEL_AMOUNT.toFixed(2)}</Td>
+                            <Td>{entry.LABOUR_AMOUNT.toFixed(2)}</Td>
+                            <Td>{entry.MEALS_AMOUNT.toFixed(2)}</Td>
+                            <Td>{entry.OTHER_AMOUNT.toFixed(2)}</Td>
+                            <Td>{entry.REMARKS}</Td>
+                            <Td>
+                                <button onClick={() => startEdit(entry)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                            </Td>
+                        </Tr>
+                    )
+                )}
+            </Table>
         </div>
     );
 };
