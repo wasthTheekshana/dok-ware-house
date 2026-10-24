@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { CheckCircle2, XCircle, Clock, CalendarOff } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { Warehouse, Staff, AttendanceStatus, AttendanceSummary, AttendanceEntry } from '../types';
+import { PageHeader, Card, StatCard, Button } from '../components/ui';
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
     { value: 'present', label: 'Present' },
@@ -126,9 +128,9 @@ const Attendance: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">Attendance</h1>
+            <PageHeader title="Attendance" />
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+            <Card className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                     {selectableWarehouses.length > 1 && (
                         <div>
@@ -149,7 +151,7 @@ const Attendance: React.FC = () => {
 
                 {staffList.length > 0 && (
                     <table className="w-full text-sm">
-                        <thead className="text-left text-slate-500">
+                        <thead className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide">
                             <tr>
                                 <th className="p-2">Staff</th>
                                 <th className="p-2">Status</th>
@@ -160,7 +162,7 @@ const Attendance: React.FC = () => {
                         <tbody>
                             {staffList.map((s) => (
                                 <tr key={s.ID} className="border-t border-slate-100">
-                                    <td className="p-2">{s.NAME}</td>
+                                    <td className="p-2 text-slate-700">{s.NAME}</td>
                                     <td className="p-2">
                                         <select
                                             className="border border-slate-300 rounded px-2 py-1"
@@ -189,13 +191,13 @@ const Attendance: React.FC = () => {
                 )}
 
                 {staffList.length > 0 && (
-                    <button onClick={handleSaveDay} disabled={saving} className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                    <Button onClick={handleSaveDay} disabled={saving}>
                         {saving ? 'Saving...' : 'Save Day'}
-                    </button>
+                    </Button>
                 )}
-            </div>
+            </Card>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <Card>
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-slate-700">Monthly Summary</h2>
                     <div className="flex gap-2">
@@ -214,26 +216,14 @@ const Attendance: React.FC = () => {
                     </div>
                 </div>
                 {summary && (
-                    <div className="grid grid-cols-4 gap-3 text-sm">
-                        <div className="bg-slate-50 rounded-lg p-3 text-center">
-                            <div className="text-slate-500">Present</div>
-                            <div className="text-lg font-semibold">{summary.counts.present}</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-lg p-3 text-center">
-                            <div className="text-slate-500">Absent</div>
-                            <div className="text-lg font-semibold">{summary.counts.absent}</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-lg p-3 text-center">
-                            <div className="text-slate-500">Half-Day</div>
-                            <div className="text-lg font-semibold">{summary.counts.half_day}</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-lg p-3 text-center">
-                            <div className="text-slate-500">Leave</div>
-                            <div className="text-lg font-semibold">{summary.counts.leave}</div>
-                        </div>
+                    <div className="grid grid-cols-4 gap-3">
+                        <StatCard label="Present" value={String(summary.counts.present)} icon={CheckCircle2} accent="green" />
+                        <StatCard label="Absent" value={String(summary.counts.absent)} icon={XCircle} accent="amber" />
+                        <StatCard label="Half-Day" value={String(summary.counts.half_day)} icon={Clock} accent="sky" />
+                        <StatCard label="Leave" value={String(summary.counts.leave)} icon={CalendarOff} accent="brand" />
                     </div>
                 )}
-            </div>
+            </Card>
         </div>
     );
 };
