@@ -3,12 +3,21 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { Warehouse, Staff, Payroll as PayrollRecord, PayrollReportRow } from '../types';
+import { PageHeader, Card, Table, Td, Tr, Badge, Button } from '../components/ui';
+import type { BadgeTone } from '../components/ui';
 
 const STATUS_LABELS: Record<string, string> = {
     draft: 'Draft',
     pending_approval: 'Pending Approval',
     approved: 'Approved',
     rejected: 'Rejected',
+};
+
+const PAYROLL_BADGE: Record<string, BadgeTone> = {
+    draft: 'neutral',
+    pending_approval: 'warning',
+    approved: 'success',
+    rejected: 'danger',
 };
 
 function currentMonth(): number {
@@ -146,10 +155,10 @@ const Payroll: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">Payroll</h1>
+            <PageHeader title="Payroll" />
 
             {canPrepareStaffList && (
-            <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+            <Card className="space-y-3">
                 <h2 className="text-sm font-semibold text-slate-700">Prepare Payroll</h2>
                 <div className="grid grid-cols-4 gap-3 items-end">
                     {selectableWarehouses.length > 1 && (
@@ -185,108 +194,83 @@ const Payroll: React.FC = () => {
                         <input type="number" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={year} onChange={(e) => setYear(Number(e.target.value))} />
                     </div>
                 </div>
-                <button onClick={handleCreate} disabled={creating || !selectedStaffId} className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                <Button onClick={handleCreate} disabled={creating || !selectedStaffId}>
                     {creating ? 'Creating...' : 'Create Draft (pre-filled from attendance)'}
-                </button>
-            </div>
+                </Button>
+            </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                        <tr>
-                            <th className="p-3">Staff</th>
-                            <th className="p-3">Period</th>
-                            <th className="p-3">Basic</th>
-                            <th className="p-3">OT</th>
-                            <th className="p-3">Deductions</th>
-                            <th className="p-3">EPF (Emp.)</th>
-                            <th className="p-3">EPF (Emplr.)</th>
-                            <th className="p-3">ETF</th>
-                            <th className="p-3">Net Salary</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {records.map((p) =>
-                            editingId === p.ID ? (
-                                <tr key={p.ID} className="border-t border-slate-100 bg-slate-50">
-                                    <td className="p-3">{p.STAFF_NAME}</td>
-                                    <td className="p-3">{p.MONTH}/{p.YEAR}</td>
-                                    <td className="p-3">{p.BASIC_PAY.toFixed(2)}</td>
-                                    <td className="p-2">
-                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editOtAmount} onChange={(e) => setEditOtAmount(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editDeductions} onChange={(e) => setEditDeductions(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEpfEmployee} onChange={(e) => setEditEpfEmployee(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEpfEmployer} onChange={(e) => setEditEpfEmployer(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEtf} onChange={(e) => setEditEtf(e.target.value)} />
-                                    </td>
-                                    <td className="p-3">—</td>
-                                    <td className="p-3 capitalize">{STATUS_LABELS[p.STATUS]}</td>
-                                    <td className="p-2">
-                                        <div className="flex gap-2">
-                                            <button onClick={() => saveEdit(p.ID)} className="text-green-600 hover:text-green-700 text-xs font-medium">Save</button>
-                                            <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600 text-xs font-medium">Cancel</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                <tr key={p.ID} className="border-t border-slate-100">
-                                    <td className="p-3">{p.STAFF_NAME}</td>
-                                    <td className="p-3">{p.MONTH}/{p.YEAR}</td>
-                                    <td className="p-3">{p.BASIC_PAY.toFixed(2)}</td>
-                                    <td className="p-3">{p.OT_AMOUNT.toFixed(2)}</td>
-                                    <td className="p-3">{p.DEDUCTIONS.toFixed(2)}</td>
-                                    <td className="p-3">{p.EPF_EMPLOYEE.toFixed(2)}</td>
-                                    <td className="p-3">{p.EPF_EMPLOYER.toFixed(2)}</td>
-                                    <td className="p-3">{p.ETF.toFixed(2)}</td>
-                                    <td className="p-3 font-medium">{p.NET_SALARY.toFixed(2)}</td>
-                                    <td className="p-3">
-                                        <span className={
-                                            p.STATUS === 'approved' ? 'text-green-600' :
-                                            p.STATUS === 'rejected' ? 'text-red-600' :
-                                            p.STATUS === 'pending_approval' ? 'text-amber-600' : 'text-slate-500'
-                                        }>
-                                            {STATUS_LABELS[p.STATUS]}
-                                        </span>
-                                    </td>
-                                    <td className="p-3">
-                                        <div className="flex gap-2 flex-wrap">
-                                            {(p.STATUS === 'draft' || p.STATUS === 'rejected') && !p.REVERSES_PAYROLL_ID && (
-                                                <>
-                                                    <button onClick={() => startEdit(p)} className="text-slate-500 hover:text-blue-600 text-xs font-medium">Edit</button>
-                                                    <button onClick={() => doAction(p.ID, 'submit', 'Submitted for approval')} className="text-blue-600 hover:text-blue-700 text-xs font-medium">Submit</button>
-                                                </>
-                                            )}
-                                            {isApprover && p.STATUS === 'pending_approval' && (
-                                                <>
-                                                    <button onClick={() => doAction(p.ID, 'approve', 'Payroll approved')} className="text-green-600 hover:text-green-700 text-xs font-medium">Approve</button>
-                                                    <button onClick={() => doAction(p.ID, 'reject', 'Payroll rejected')} className="text-red-600 hover:text-red-700 text-xs font-medium">Reject</button>
-                                                </>
-                                            )}
-                                            {isApprover && p.STATUS === 'approved' && !p.REVERSES_PAYROLL_ID && (
-                                                <button onClick={() => doAction(p.ID, 'reverse', 'Payroll reversed')} className="text-amber-600 hover:text-amber-700 text-xs font-medium">Reverse</button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            )
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <Table headers={['Staff', 'Period', 'Basic', 'OT', 'Deductions', 'EPF (Emp.)', 'EPF (Emplr.)', 'ETF', 'Net Salary', 'Status', 'Actions']}>
+                {records.map((p) =>
+                    editingId === p.ID ? (
+                        <Tr key={p.ID} className="bg-slate-50">
+                            <Td>{p.STAFF_NAME}</Td>
+                            <Td>{p.MONTH}/{p.YEAR}</Td>
+                            <Td>{p.BASIC_PAY.toFixed(2)}</Td>
+                            <Td className="p-2">
+                                <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editOtAmount} onChange={(e) => setEditOtAmount(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editDeductions} onChange={(e) => setEditDeductions(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEpfEmployee} onChange={(e) => setEditEpfEmployee(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEpfEmployer} onChange={(e) => setEditEpfEmployer(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" className="border border-slate-300 rounded px-2 py-1 w-20" value={editEtf} onChange={(e) => setEditEtf(e.target.value)} />
+                            </Td>
+                            <Td>—</Td>
+                            <Td className="capitalize">{STATUS_LABELS[p.STATUS]}</Td>
+                            <Td className="p-2">
+                                <div className="flex gap-2">
+                                    <Button variant="primary" className="text-xs px-2 py-1" onClick={() => saveEdit(p.ID)}>Save</Button>
+                                    <Button variant="secondary" className="text-xs px-2 py-1" onClick={cancelEdit}>Cancel</Button>
+                                </div>
+                            </Td>
+                        </Tr>
+                    ) : (
+                        <Tr key={p.ID}>
+                            <Td>{p.STAFF_NAME}</Td>
+                            <Td>{p.MONTH}/{p.YEAR}</Td>
+                            <Td>{p.BASIC_PAY.toFixed(2)}</Td>
+                            <Td>{p.OT_AMOUNT.toFixed(2)}</Td>
+                            <Td>{p.DEDUCTIONS.toFixed(2)}</Td>
+                            <Td>{p.EPF_EMPLOYEE.toFixed(2)}</Td>
+                            <Td>{p.EPF_EMPLOYER.toFixed(2)}</Td>
+                            <Td>{p.ETF.toFixed(2)}</Td>
+                            <Td className="font-medium">{p.NET_SALARY.toFixed(2)}</Td>
+                            <Td>
+                                <Badge tone={PAYROLL_BADGE[p.STATUS]}>{STATUS_LABELS[p.STATUS]}</Badge>
+                            </Td>
+                            <Td>
+                                <div className="flex gap-2 flex-wrap">
+                                    {(p.STATUS === 'draft' || p.STATUS === 'rejected') && !p.REVERSES_PAYROLL_ID && (
+                                        <>
+                                            <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => startEdit(p)}>Edit</Button>
+                                            <Button variant="primary" className="text-xs px-2 py-1" onClick={() => doAction(p.ID, 'submit', 'Submitted for approval')}>Submit</Button>
+                                        </>
+                                    )}
+                                    {isApprover && p.STATUS === 'pending_approval' && (
+                                        <>
+                                            <Button variant="primary" className="text-xs px-2 py-1" onClick={() => doAction(p.ID, 'approve', 'Payroll approved')}>Approve</Button>
+                                            <Button variant="danger" className="text-xs px-2 py-1" onClick={() => doAction(p.ID, 'reject', 'Payroll rejected')}>Reject</Button>
+                                        </>
+                                    )}
+                                    {isApprover && p.STATUS === 'approved' && !p.REVERSES_PAYROLL_ID && (
+                                        <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => doAction(p.ID, 'reverse', 'Payroll reversed')}>Reverse</Button>
+                                    )}
+                                </div>
+                            </Td>
+                        </Tr>
+                    )
+                )}
+            </Table>
 
             {isApprover && (
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <Card>
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-semibold text-slate-700">Consolidated Payroll Report</h2>
                         <div className="flex gap-2">
@@ -299,11 +283,11 @@ const Payroll: React.FC = () => {
                         </div>
                     </div>
                     <table className="w-full text-sm">
-                        <thead className="text-left text-slate-500">
+                        <thead className="text-left text-slate-400">
                             <tr>
-                                <th className="p-2">Warehouse</th>
-                                <th className="p-2">Net Salary (Employee-side)</th>
-                                <th className="p-2">Total Employer Cost</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Warehouse</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Net Salary (Employee-side)</th>
+                                <th className="p-2 font-medium text-xs uppercase tracking-wide">Total Employer Cost</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -316,7 +300,7 @@ const Payroll: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                </Card>
             )}
         </div>
     );
