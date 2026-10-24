@@ -1,5 +1,62 @@
 // warehouse-server/src/tests/auditLog.test.ts
 import { logAudit } from '../utils/auditLog';
+import request from 'supertest';
+import express, { Request, Response, NextFunction } from 'express';
+
+jest.mock('../middleware/authMiddleware', () => ({
+    authenticateToken: (req: Request, _res: Response, next: NextFunction) => {
+        (req as any).user = (req.headers['x-test-role'] ? { id: 1, role: req.headers['x-test-role'] } : { id: 1, role: 'system_admin' });
+        next();
+    },
+}));
+jest.mock('../db/dbUtils', () => ({ execute: jest.fn(), withTransaction: jest.fn() }));
+
+import auditLogRoutes from '../routes/auditLogRoutes';
+import { execute } from '../db/dbUtils';
+const mockExecute = execute as jest.Mock;
+
+const app = express();
+app.use(express.json());
+app.use('/api/audit-log', auditLogRoutes);
+
+describe('GET /api/audit-log', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('returns 403 for a finance_officer', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+        const res = await request(app).get('/api/audit-log').set('x-test-role', 'finance_officer');
+        expect(res.status).toBe(403);
+    });
+
+    it('returns 403 for a warehouse_admin', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+        const res = await request(app).get('/api/audit-log').set('x-test-role', 'warehouse_admin');
+        expect(res.status).toBe(403);
+    });
+
+    it('returns 200 with rows for a system_admin', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, TABLE_NAME: 'invoices', RECORD_ID: 7, ACTION: 'create' }] });
+        const res = await request(app).get('/api/audit-log');
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(1);
+    });
+
+    it('filters by table_name and record_id', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+        await request(app).get('/api/audit-log?table_name=invoices&record_id=7');
+        const [query, params] = mockExecute.mock.calls[0];
+        expect(query).toMatch(/AND al\.table_name = :table_name/);
+        expect(query).toMatch(/AND al\.record_id = :record_id/);
+        expect(params).toMatchObject({ table_name: 'invoices', record_id: '7' });
+    });
+
+    it('joins users to include the actor username', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+        await request(app).get('/api/audit-log');
+        const [query] = mockExecute.mock.calls[0];
+        expect(query).toMatch(/JOIN users/);
+    });
+});
 
 describe('logAudit', () => {
     it('inserts with the given table_name, record_id, action, and actor_id', async () => {

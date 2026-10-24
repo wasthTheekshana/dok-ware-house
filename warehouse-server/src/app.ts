@@ -12,6 +12,7 @@ import expenseRoutes from './routes/expenseRoutes';
 import staffRoutes from './routes/staffRoutes';
 import attendanceRoutes from './routes/attendanceRoutes';
 import payrollRoutes from './routes/payrollRoutes';
+import auditLogRoutes from './routes/auditLogRoutes';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/audit-log', auditLogRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
