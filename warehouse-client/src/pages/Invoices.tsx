@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { Company, Department, Invoice, InvoiceBreakdown } from '../types';
+import { PageHeader, Card, Table, Td, Tr, Badge, Button } from '../components/ui';
 
 const Invoices: React.FC = () => {
     const { user } = useAuth();
@@ -105,9 +106,9 @@ const Invoices: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">Invoices</h1>
+            <PageHeader title="Invoices" />
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-5 gap-3 items-end">
+            <Card className="grid grid-cols-5 gap-3 items-end">
                 <div>
                     <label className="block text-sm font-medium text-slate-600 mb-1">Company</label>
                     <select className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={companyId} onChange={(e) => { setCompanyId(e.target.value); setDepartmentId(''); setPreview(null); }}>
@@ -134,17 +135,16 @@ const Invoices: React.FC = () => {
                     <label className="block text-sm font-medium text-slate-600 mb-1">Period To</label>
                     <input type="date" className="border border-slate-300 rounded-lg px-3 py-2 w-full" value={periodTo} onChange={(e) => { setPeriodTo(e.target.value); setPreview(null); }} />
                 </div>
-                <button
+                <Button
                     onClick={handlePreview}
                     disabled={!canManageInvoices || !departmentId || !periodFrom || !periodTo || previewing}
-                    className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
                     {previewing ? 'Loading...' : 'Preview'}
-                </button>
-            </div>
+                </Button>
+            </Card>
 
             {preview && (
-                <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                <Card className="space-y-3">
                     <h2 className="text-lg font-semibold text-slate-700">{preview.DEPARTMENT_NAME} — {preview.COMPANY_NAME}</h2>
                     <div className="text-sm text-slate-500">{preview.PERIOD_FROM} to {preview.PERIOD_TO}</div>
                     <table className="w-full text-sm">
@@ -183,50 +183,35 @@ const Invoices: React.FC = () => {
                             </tr>
                         </tbody>
                     </table>
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={handleSave}
                         disabled={saving}
-                        className="bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                     >
                         {saving ? 'Saving...' : 'Save Invoice'}
-                    </button>
-                </div>
+                    </Button>
+                </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-slate-200">
-                <div className="p-4 border-b border-slate-200 font-semibold text-slate-700">Saved Invoices</div>
-                <table className="w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                        <tr>
-                            <th className="p-3">Period</th>
-                            <th className="p-3">Company</th>
-                            <th className="p-3">Department</th>
-                            <th className="p-3">Total</th>
-                            <th className="p-3">Saved</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {invoices.map((inv) => (
-                            <tr key={inv.ID} className="border-t border-slate-100">
-                                <td className="p-3">{inv.PERIOD_FROM} to {inv.PERIOD_TO}</td>
-                                <td className="p-3">{inv.COMPANY_NAME}</td>
-                                <td className="p-3">{inv.DEPARTMENT_NAME}</td>
-                                <td className="p-3">{inv.TOTAL_AMOUNT}</td>
-                                <td className="p-3">{inv.CREATED_AT}</td>
-                                <td className="p-3">
-                                    {canManageInvoices && inv.REVERSES_INVOICE_ID === null && !reversedOriginalIds.has(inv.ID) && (
-                                        <button onClick={() => handleReverse(inv.ID)} className="text-red-600 hover:text-red-700 text-xs font-medium">Reverse</button>
-                                    )}
-                                    {inv.REVERSES_INVOICE_ID !== null && (
-                                        <span className="text-slate-400 text-xs italic">Reversal of #{inv.REVERSES_INVOICE_ID}</span>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <Table headers={['Period', 'Company', 'Department', 'Total', 'Saved', 'Actions']} title="Saved Invoices" empty={invoices.length === 0}>
+                {invoices.map((inv) => (
+                    <Tr key={inv.ID}>
+                        <Td>{inv.PERIOD_FROM} to {inv.PERIOD_TO}</Td>
+                        <Td>{inv.COMPANY_NAME}</Td>
+                        <Td>{inv.DEPARTMENT_NAME}</Td>
+                        <Td>{inv.TOTAL_AMOUNT}</Td>
+                        <Td>{inv.CREATED_AT}</Td>
+                        <Td>
+                            {canManageInvoices && inv.REVERSES_INVOICE_ID === null && !reversedOriginalIds.has(inv.ID) && (
+                                <Button variant="danger" className="text-xs px-2 py-1" onClick={() => handleReverse(inv.ID)}>Reverse</Button>
+                            )}
+                            {inv.REVERSES_INVOICE_ID !== null && (
+                                <Badge tone="neutral">Reversal of #{inv.REVERSES_INVOICE_ID}</Badge>
+                            )}
+                        </Td>
+                    </Tr>
+                ))}
+            </Table>
         </div>
     );
 };
