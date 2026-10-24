@@ -23,15 +23,15 @@ describe('GET /api/audit-log', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
     it('returns 403 for a finance_officer', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [] });
         const res = await request(app).get('/api/audit-log').set('x-test-role', 'finance_officer');
         expect(res.status).toBe(403);
+        expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('returns 403 for a warehouse_admin', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [] });
         const res = await request(app).get('/api/audit-log').set('x-test-role', 'warehouse_admin');
         expect(res.status).toBe(403);
+        expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('returns 200 with rows for a system_admin', async () => {
@@ -55,6 +55,27 @@ describe('GET /api/audit-log', () => {
         await request(app).get('/api/audit-log');
         const [query] = mockExecute.mock.calls[0];
         expect(query).toMatch(/JOIN users/);
+    });
+
+    it('filters "to" inclusively through the end of the given day, not midnight at its start', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [] });
+        const res = await request(app).get('/api/audit-log?to=2026-10-24');
+        expect(res.status).toBe(200);
+        const [query, params] = mockExecute.mock.calls[0];
+        expect(query).toMatch(/AND al\.created_at < :to::date \+ interval '1 day'/);
+        expect(params).toMatchObject({ to: '2026-10-24' });
+    });
+
+    it('returns 400 for a malformed "from" date instead of hitting the database', async () => {
+        const res = await request(app).get('/api/audit-log?from=not-a-date');
+        expect(res.status).toBe(400);
+        expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for a malformed "to" date instead of hitting the database', async () => {
+        const res = await request(app).get('/api/audit-log?to=2026/10/24');
+        expect(res.status).toBe(400);
+        expect(mockExecute).not.toHaveBeenCalled();
     });
 });
 

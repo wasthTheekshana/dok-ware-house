@@ -18,7 +18,7 @@ export const getAuditLog = async (req: Request, res: Response) => {
         if (record_id) { query += ` AND al.record_id = :record_id`; params.record_id = record_id; }
         if (actor_id) { query += ` AND al.actor_id = :actor_id`; params.actor_id = actor_id; }
         if (from) { query += ` AND al.created_at >= :from`; params.from = from; }
-        if (to) { query += ` AND al.created_at <= :to`; params.to = to; }
+        if (to) { query += ` AND al.created_at < :to::date + interval '1 day'`; params.to = to; }
         query += ` ORDER BY al.created_at DESC LIMIT 500`;
 
         const result = await execute<any>(query, params);
