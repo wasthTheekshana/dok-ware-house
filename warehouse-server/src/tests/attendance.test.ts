@@ -134,7 +134,7 @@ describe('bulkMarkAttendance audit logging', () => {
 
         const res = await request(app).post('/api/attendance/bulk-mark').send(VALID_BODY);
 
-        expect(res.status).toBeGreaterThanOrEqual(400);
+        expect(res.status).toBe(500);
     });
 });
 
