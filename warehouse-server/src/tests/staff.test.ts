@@ -93,6 +93,16 @@ describe('PUT /api/staff/:id', () => {
 
         expect(res.status).toBe(404);
     });
+
+    it('returns 404 (not a 500) when the staff member is deleted between the existence check and the UPDATE', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'active' }] }) // existence check finds the row
+            .mockResolvedValueOnce({ rows: [] }); // UPDATE finds nothing — deleted concurrently
+
+        const res = await request(app).put('/api/staff/1').send({ status: 'inactive' });
+
+        expect(res.status).toBe(404);
+    });
 });
 
 describe('POST /api/staff — warehouse scoping for warehouse_admin', () => {

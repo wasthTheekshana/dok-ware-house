@@ -88,9 +88,15 @@ export const updateStaff = async (req: Request, res: Response) => {
                 `UPDATE staff SET ${setClauses} WHERE id = :id RETURNING *`,
                 { ...fields, id }
             );
+            if (result.rows.length === 0) {
+                return null;
+            }
             await logAudit(exec, 'staff', result.rows[0].ID, 'update', (req as any).user?.id ?? null, before, result.rows[0]);
             return result.rows[0];
         });
+        if (!updatedRow) {
+            return res.status(404).json({ message: 'Staff member not found' });
+        }
         res.json(updatedRow);
     } catch (err) {
         console.error('updateStaff error:', err);

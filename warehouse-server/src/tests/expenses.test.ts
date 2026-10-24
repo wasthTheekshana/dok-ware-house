@@ -107,6 +107,15 @@ describe('PUT /api/expenses/:id', () => {
         expect(res.status).toBe(404);
     });
 
+    it('returns 404 (not a 500) when the entry is deleted between the existence check and the UPDATE', async () => {
+        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1 }] }); // existence check finds the row
+        mockTxExec.mockResolvedValueOnce({ rows: [] }); // UPDATE finds nothing — deleted concurrently
+
+        const res = await request(app).put('/api/expenses/1').send({ transport_amount: 750 });
+
+        expect(res.status).toBe(404);
+    });
+
     it('rejects a body with no fields to update', async () => {
         const res = await request(app).put('/api/expenses/1').send({});
 

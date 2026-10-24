@@ -97,9 +97,15 @@ export const updateExpense = async (req: Request, res: Response) => {
                 `UPDATE warehouse_expenses SET ${setClauses}, updated_at = now() WHERE id = :id RETURNING *`,
                 { ...fields, id }
             );
+            if (result.rows.length === 0) {
+                return null;
+            }
             await logAudit(exec, 'warehouse_expenses', result.rows[0].ID, 'update', (req as any).user?.id ?? null, before, result.rows[0]);
             return result.rows[0];
         });
+        if (!updatedRow) {
+            return res.status(404).json({ message: 'Expense entry not found' });
+        }
         res.json(updatedRow);
     } catch (err) {
         console.error('updateExpense error:', err);
