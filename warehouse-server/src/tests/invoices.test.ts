@@ -12,7 +12,13 @@ jest.mock('../middleware/authMiddleware', () => ({
 
 jest.mock('../middleware/permissionMiddleware', () => ({ requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next() }));
 
-jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
+jest.mock('../db/dbUtils', () => {
+    const execute = jest.fn();
+    return {
+        execute,
+        withTransaction: jest.fn(async (fn: any) => fn(execute)),
+    };
+});
 
 import invoiceRoutes from '../routes/invoiceRoutes';
 import { execute } from '../db/dbUtils';
@@ -191,6 +197,71 @@ describe('POST /api/invoices/:id/reverse', () => {
         const res = await request(app).post('/api/invoices/1/reverse');
 
         expect(res.status).toBe(409);
+    });
+});
+
+describe('POST /api/invoices audit logging', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('logs a create audit row for the new invoice inside the same transaction', async () => {
+        const INSERTED_ROW = { ID: 1, DEPARTMENT_ID: 1, SUBTOTAL: 7900, TOTAL_AMOUNT: 9563.15 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [DEPT_ROW] })
+            .mockResolvedValueOnce({ rows: [{ EVENT_TYPE: 'archived', TOTAL: 100 }, { EVENT_TYPE: 'retrieved', TOTAL: 20 }] })
+            .mockResolvedValueOnce({ rows: [INSERTED_ROW] })
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).post('/api/invoices').send(VALID_BODY);
+
+        expect(res.status).toBe(201);
+        const auditCall = mockExecute.mock.calls[3];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('create');
+        expect(auditCall[1].before_value).toBeNull();
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(INSERTED_ROW);
+    });
+
+    it('rolls back the invoice insert if the audit insert fails', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [DEPT_ROW] })
+            .mockResolvedValueOnce({ rows: [{ EVENT_TYPE: 'archived', TOTAL: 100 }, { EVENT_TYPE: 'retrieved', TOTAL: 20 }] })
+            .mockResolvedValueOnce({ rows: [{ ID: 1, DEPARTMENT_ID: 1, SUBTOTAL: 7900, TOTAL_AMOUNT: 9563.15 }] })
+            .mockRejectedValueOnce(new Error('audit insert failed'));
+
+        const res = await request(app).post('/api/invoices').send(VALID_BODY);
+
+        expect(res.status).toBe(500);
+    });
+});
+
+describe('POST /api/invoices/:id/reverse audit logging', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    const ORIGINAL_ROW = {
+        ID: 1, DEPARTMENT_ID: 1, COMPANY_ID: 1, DEPARTMENT_NAME: 'CASH DEPT', COMPANY_NAME: 'AB Securitas',
+        PERIOD_FROM: '2026-07-01', PERIOD_TO: '2026-07-31',
+        ARCHIVED_COUNT: 100, RETRIEVED_COUNT: 20, EMPTY_CARTON_COUNT: 5,
+        PRICE_PER_ARCHIVED_BOX: 50, PRICE_PER_RETRIEVED_BOX: 45, PRICE_PER_EMPTY_CARTON: 20,
+        BOX_COUNT_AT_BILLING: 200, STORAGE_RENTAL_AMOUNT: 2000,
+        SUBTOTAL: 7900, SSCL_AMOUNT: 202.56, VAT_AMOUNT: 1458.46, TOTAL_AMOUNT: 9561.02,
+        REVERSES_INVOICE_ID: null,
+    };
+
+    it('logs a reverse audit row with before_value = the original invoice and after_value = the new reversal row', async () => {
+        const REVERSAL_ROW = { ID: 2, REVERSES_INVOICE_ID: 1, SUBTOTAL: -7900 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [ORIGINAL_ROW] })
+            .mockResolvedValueOnce({ rows: [REVERSAL_ROW] })
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).post('/api/invoices/1/reverse');
+
+        expect(res.status).toBe(201);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('reverse');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(ORIGINAL_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(REVERSAL_ROW);
     });
 });
 

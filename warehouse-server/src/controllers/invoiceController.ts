@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { execute } from '../db/dbUtils';
+import { execute, withTransaction } from '../db/dbUtils';
 import { computeInvoiceAmounts, round2 } from '../utils/invoiceCalc';
+import { logAudit } from '../utils/auditLog';
 
 const SSCL_RATE = parseFloat(process.env.SSCL_RATE || '0.025641');
 const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.18');
@@ -97,43 +98,47 @@ export const createInvoice = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Department not found' });
         }
 
-        const result = await execute<any>(
-            `INSERT INTO invoices (
-                department_id, company_id, department_name, company_name,
-                period_from, period_to, archived_count, retrieved_count, empty_carton_count,
-                price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
-                box_count_at_billing, storage_rental_amount,
-                subtotal, sscl_amount, vat_amount, total_amount, created_by
-            ) VALUES (
-                :department_id, :company_id, :department_name, :company_name,
-                :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
-                :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
-                :box_count_at_billing, :storage_rental_amount,
-                :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by
-            ) RETURNING *`,
-            {
-                department_id: breakdown.DEPARTMENT_ID,
-                company_id: breakdown.COMPANY_ID,
-                department_name: breakdown.DEPARTMENT_NAME,
-                company_name: breakdown.COMPANY_NAME,
-                period_from: breakdown.PERIOD_FROM,
-                period_to: breakdown.PERIOD_TO,
-                archived_count: breakdown.ARCHIVED_COUNT,
-                retrieved_count: breakdown.RETRIEVED_COUNT,
-                empty_carton_count: breakdown.EMPTY_CARTON_COUNT,
-                price_per_archived_box: breakdown.PRICE_PER_ARCHIVED_BOX,
-                price_per_retrieved_box: breakdown.PRICE_PER_RETRIEVED_BOX,
-                price_per_empty_carton: breakdown.PRICE_PER_EMPTY_CARTON,
-                box_count_at_billing: breakdown.BOX_COUNT_AT_BILLING,
-                storage_rental_amount: breakdown.STORAGE_RENTAL_AMOUNT,
-                subtotal: breakdown.SUBTOTAL,
-                sscl_amount: breakdown.SSCL_AMOUNT,
-                vat_amount: breakdown.VAT_AMOUNT,
-                total_amount: breakdown.TOTAL_AMOUNT,
-                created_by: userId,
-            }
-        );
-        res.status(201).json(result.rows[0]);
+        const insertedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `INSERT INTO invoices (
+                    department_id, company_id, department_name, company_name,
+                    period_from, period_to, archived_count, retrieved_count, empty_carton_count,
+                    price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
+                    box_count_at_billing, storage_rental_amount,
+                    subtotal, sscl_amount, vat_amount, total_amount, created_by
+                ) VALUES (
+                    :department_id, :company_id, :department_name, :company_name,
+                    :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
+                    :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
+                    :box_count_at_billing, :storage_rental_amount,
+                    :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by
+                ) RETURNING *`,
+                {
+                    department_id: breakdown.DEPARTMENT_ID,
+                    company_id: breakdown.COMPANY_ID,
+                    department_name: breakdown.DEPARTMENT_NAME,
+                    company_name: breakdown.COMPANY_NAME,
+                    period_from: breakdown.PERIOD_FROM,
+                    period_to: breakdown.PERIOD_TO,
+                    archived_count: breakdown.ARCHIVED_COUNT,
+                    retrieved_count: breakdown.RETRIEVED_COUNT,
+                    empty_carton_count: breakdown.EMPTY_CARTON_COUNT,
+                    price_per_archived_box: breakdown.PRICE_PER_ARCHIVED_BOX,
+                    price_per_retrieved_box: breakdown.PRICE_PER_RETRIEVED_BOX,
+                    price_per_empty_carton: breakdown.PRICE_PER_EMPTY_CARTON,
+                    box_count_at_billing: breakdown.BOX_COUNT_AT_BILLING,
+                    storage_rental_amount: breakdown.STORAGE_RENTAL_AMOUNT,
+                    subtotal: breakdown.SUBTOTAL,
+                    sscl_amount: breakdown.SSCL_AMOUNT,
+                    vat_amount: breakdown.VAT_AMOUNT,
+                    total_amount: breakdown.TOTAL_AMOUNT,
+                    created_by: userId,
+                }
+            );
+            await logAudit(exec, 'invoices', result.rows[0].ID, 'create', userId, null, result.rows[0]);
+            return result.rows[0];
+        });
+        res.status(201).json(insertedRow);
     } catch (err: any) {
         if (err.code === '23505') {
             return res.status(409).json({ message: 'An invoice for this department and period has already been saved' });
@@ -174,44 +179,48 @@ export const reverseInvoice = async (req: Request, res: Response) => {
         }
         const original = originalResult.rows[0];
 
-        const result = await execute<any>(
-            `INSERT INTO invoices (
-                department_id, company_id, department_name, company_name,
-                period_from, period_to, archived_count, retrieved_count, empty_carton_count,
-                price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
-                box_count_at_billing, storage_rental_amount,
-                subtotal, sscl_amount, vat_amount, total_amount, created_by, reverses_invoice_id
-            ) VALUES (
-                :department_id, :company_id, :department_name, :company_name,
-                :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
-                :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
-                :box_count_at_billing, :storage_rental_amount,
-                :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by, :reverses_invoice_id
-            ) RETURNING *`,
-            {
-                department_id: original.DEPARTMENT_ID,
-                company_id: original.COMPANY_ID,
-                department_name: original.DEPARTMENT_NAME,
-                company_name: original.COMPANY_NAME,
-                period_from: original.PERIOD_FROM,
-                period_to: original.PERIOD_TO,
-                archived_count: -original.ARCHIVED_COUNT,
-                retrieved_count: -original.RETRIEVED_COUNT,
-                empty_carton_count: -original.EMPTY_CARTON_COUNT,
-                price_per_archived_box: original.PRICE_PER_ARCHIVED_BOX,
-                price_per_retrieved_box: original.PRICE_PER_RETRIEVED_BOX,
-                price_per_empty_carton: original.PRICE_PER_EMPTY_CARTON,
-                box_count_at_billing: original.BOX_COUNT_AT_BILLING,
-                storage_rental_amount: -original.STORAGE_RENTAL_AMOUNT,
-                subtotal: -original.SUBTOTAL,
-                sscl_amount: -original.SSCL_AMOUNT,
-                vat_amount: -original.VAT_AMOUNT,
-                total_amount: -original.TOTAL_AMOUNT,
-                created_by: userId,
-                reverses_invoice_id: original.ID,
-            }
-        );
-        res.status(201).json(result.rows[0]);
+        const reversalRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `INSERT INTO invoices (
+                    department_id, company_id, department_name, company_name,
+                    period_from, period_to, archived_count, retrieved_count, empty_carton_count,
+                    price_per_archived_box, price_per_retrieved_box, price_per_empty_carton,
+                    box_count_at_billing, storage_rental_amount,
+                    subtotal, sscl_amount, vat_amount, total_amount, created_by, reverses_invoice_id
+                ) VALUES (
+                    :department_id, :company_id, :department_name, :company_name,
+                    :period_from, :period_to, :archived_count, :retrieved_count, :empty_carton_count,
+                    :price_per_archived_box, :price_per_retrieved_box, :price_per_empty_carton,
+                    :box_count_at_billing, :storage_rental_amount,
+                    :subtotal, :sscl_amount, :vat_amount, :total_amount, :created_by, :reverses_invoice_id
+                ) RETURNING *`,
+                {
+                    department_id: original.DEPARTMENT_ID,
+                    company_id: original.COMPANY_ID,
+                    department_name: original.DEPARTMENT_NAME,
+                    company_name: original.COMPANY_NAME,
+                    period_from: original.PERIOD_FROM,
+                    period_to: original.PERIOD_TO,
+                    archived_count: -original.ARCHIVED_COUNT,
+                    retrieved_count: -original.RETRIEVED_COUNT,
+                    empty_carton_count: -original.EMPTY_CARTON_COUNT,
+                    price_per_archived_box: original.PRICE_PER_ARCHIVED_BOX,
+                    price_per_retrieved_box: original.PRICE_PER_RETRIEVED_BOX,
+                    price_per_empty_carton: original.PRICE_PER_EMPTY_CARTON,
+                    box_count_at_billing: original.BOX_COUNT_AT_BILLING,
+                    storage_rental_amount: -original.STORAGE_RENTAL_AMOUNT,
+                    subtotal: -original.SUBTOTAL,
+                    sscl_amount: -original.SSCL_AMOUNT,
+                    vat_amount: -original.VAT_AMOUNT,
+                    total_amount: -original.TOTAL_AMOUNT,
+                    created_by: userId,
+                    reverses_invoice_id: original.ID,
+                }
+            );
+            await logAudit(exec, 'invoices', result.rows[0].ID, 'reverse', userId, original, result.rows[0]);
+            return result.rows[0];
+        });
+        res.status(201).json(reversalRow);
     } catch (err: any) {
         if (err.code === '23505') {
             return res.status(409).json({ message: 'This invoice has already been reversed' });
