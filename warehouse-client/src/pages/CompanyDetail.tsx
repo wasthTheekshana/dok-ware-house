@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Pencil, Check, X } from 'lucide-react';
 import api from '../services/api';
 import type { Company, Warehouse, Department } from '../types';
+import { PageHeader, Card, Table, Td, Tr, Button } from '../components/ui';
 
 const CompanyDetail: React.FC = () => {
     const { id } = useParams();
@@ -84,105 +85,88 @@ const CompanyDetail: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">{company.NAME}</h1>
-            <div className="text-sm text-slate-500">{company.CODE}</div>
-
-            <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-700">Departments</h2>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700"
-                >
-                    {showForm ? 'Cancel' : 'New Department'}
-                </button>
-            </div>
+            <PageHeader
+                title={company.NAME}
+                subtitle={company.CODE ?? undefined}
+                action={
+                    <Button onClick={() => setShowForm(!showForm)}>
+                        {showForm ? 'Cancel' : 'New Department'}
+                    </Button>
+                }
+            />
 
             {showForm && (
-                <form onSubmit={handleCreate} className="bg-white rounded-xl border border-slate-200 p-4 flex gap-3 items-end">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Name</label>
-                        <input className="border border-slate-300 rounded-lg px-3 py-2" value={deptName} onChange={(e) => setDeptName(e.target.value)} required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Code</label>
-                        <input className="border border-slate-300 rounded-lg px-3 py-2" value={deptCode} onChange={(e) => setDeptCode(e.target.value)} />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
-                        <select className="border border-slate-300 rounded-lg px-3 py-2" value={deptWarehouseId} onChange={(e) => setDeptWarehouseId(e.target.value)} required>
-                            <option value="">Select...</option>
-                            {warehouses.map((w) => (
-                                <option key={w.ID} value={w.ID}>{w.NAME}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <button type="submit" className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700">
-                        Save
-                    </button>
-                </form>
+                <Card>
+                    <form onSubmit={handleCreate} className="flex gap-3 items-end">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Name</label>
+                            <input className="border border-slate-300 rounded-lg px-3 py-2" value={deptName} onChange={(e) => setDeptName(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Code</label>
+                            <input className="border border-slate-300 rounded-lg px-3 py-2" value={deptCode} onChange={(e) => setDeptCode(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Warehouse</label>
+                            <select className="border border-slate-300 rounded-lg px-3 py-2" value={deptWarehouseId} onChange={(e) => setDeptWarehouseId(e.target.value)} required>
+                                <option value="">Select...</option>
+                                {warehouses.map((w) => (
+                                    <option key={w.ID} value={w.ID}>{w.NAME}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <Button type="submit">Save</Button>
+                    </form>
+                </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                        <tr>
-                            <th className="p-3">Name</th>
-                            <th className="p-3">Code</th>
-                            <th className="p-3">Warehouse</th>
-                            <th className="p-3">Current Box Count</th>
-                            <th className="p-3">Price/Archived</th>
-                            <th className="p-3">Price/Retrieved</th>
-                            <th className="p-3">Price/Empty Carton</th>
-                            <th className="p-3">Price/Storage Rental (monthly)</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(company.DEPARTMENTS || []).map((d) =>
-                            editingDeptId === d.ID ? (
-                                <tr key={d.ID} className="border-t border-slate-100 bg-slate-50">
-                                    <td className="p-3">{d.NAME}</td>
-                                    <td className="p-3">{d.CODE}</td>
-                                    <td className="p-3">{d.WAREHOUSE_NAME}</td>
-                                    <td className="p-3">{d.CURRENT_BOX_COUNT}</td>
-                                    <td className="p-2">
-                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editArchivedPrice} onChange={(e) => setEditArchivedPrice(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editRetrievedPrice} onChange={(e) => setEditRetrievedPrice(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editEmptyCartonPrice} onChange={(e) => setEditEmptyCartonPrice(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editStoredMonthlyPrice} onChange={(e) => setEditStoredMonthlyPrice(e.target.value)} />
-                                    </td>
-                                    <td className="p-2">
-                                        <div className="flex gap-2">
-                                            <button onClick={() => saveEditDept(d.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
-                                            <button onClick={cancelEditDept} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                <tr key={d.ID} className="border-t border-slate-100">
-                                    <td className="p-3">{d.NAME}</td>
-                                    <td className="p-3">{d.CODE}</td>
-                                    <td className="p-3">{d.WAREHOUSE_NAME}</td>
-                                    <td className="p-3">{d.CURRENT_BOX_COUNT}</td>
-                                    <td className="p-3">{d.PRICE_PER_ARCHIVED_BOX}</td>
-                                    <td className="p-3">{d.PRICE_PER_RETRIEVED_BOX}</td>
-                                    <td className="p-3">{d.PRICE_PER_EMPTY_CARTON}</td>
-                                    <td className="p-3">{d.PRICE_PER_BOX_STORED_MONTHLY}</td>
-                                    <td className="p-3">
-                                        <button onClick={() => startEditDept(d)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
-                                    </td>
-                                </tr>
-                            )
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <Table
+                headers={['Name', 'Code', 'Warehouse', 'Current Box Count', 'Price/Archived', 'Price/Retrieved', 'Price/Empty Carton', 'Price/Storage Rental (monthly)', 'Actions']}
+                empty={(company.DEPARTMENTS || []).length === 0}
+            >
+                {(company.DEPARTMENTS || []).map((d) =>
+                    editingDeptId === d.ID ? (
+                        <Tr key={d.ID} className="bg-slate-50">
+                            <Td>{d.NAME}</Td>
+                            <Td>{d.CODE}</Td>
+                            <Td>{d.WAREHOUSE_NAME}</Td>
+                            <Td>{d.CURRENT_BOX_COUNT}</Td>
+                            <Td className="p-2">
+                                <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editArchivedPrice} onChange={(e) => setEditArchivedPrice(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editRetrievedPrice} onChange={(e) => setEditRetrievedPrice(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editEmptyCartonPrice} onChange={(e) => setEditEmptyCartonPrice(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <input type="number" min="0" step="0.01" className="border border-slate-300 rounded px-2 py-1 w-24" value={editStoredMonthlyPrice} onChange={(e) => setEditStoredMonthlyPrice(e.target.value)} />
+                            </Td>
+                            <Td className="p-2">
+                                <div className="flex gap-2">
+                                    <button onClick={() => saveEditDept(d.ID)} className="text-green-600 hover:text-green-700" title="Save"><Check size={16} /></button>
+                                    <button onClick={cancelEditDept} className="text-slate-400 hover:text-slate-600" title="Cancel"><X size={16} /></button>
+                                </div>
+                            </Td>
+                        </Tr>
+                    ) : (
+                        <Tr key={d.ID}>
+                            <Td>{d.NAME}</Td>
+                            <Td>{d.CODE}</Td>
+                            <Td>{d.WAREHOUSE_NAME}</Td>
+                            <Td>{d.CURRENT_BOX_COUNT}</Td>
+                            <Td>{d.PRICE_PER_ARCHIVED_BOX}</Td>
+                            <Td>{d.PRICE_PER_RETRIEVED_BOX}</Td>
+                            <Td>{d.PRICE_PER_EMPTY_CARTON}</Td>
+                            <Td>{d.PRICE_PER_BOX_STORED_MONTHLY}</Td>
+                            <Td>
+                                <button onClick={() => startEditDept(d)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                            </Td>
+                        </Tr>
+                    )
+                )}
+            </Table>
         </div>
     );
 };
