@@ -13,7 +13,13 @@ jest.mock('../middleware/permissionMiddleware', () => ({
     requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
+jest.mock('../db/dbUtils', () => {
+    const execute = jest.fn();
+    return {
+        execute,
+        withTransaction: jest.fn(async (fn: any) => fn(execute)),
+    };
+});
 
 import staffRoutes from '../routes/staffRoutes';
 import { execute } from '../db/dbUtils';
@@ -30,7 +36,9 @@ describe('POST /api/staff', () => {
     beforeEach(() => { mockExecute.mockReset(); });
 
     it('creates a staff member, defaulting basic_salary to 0', async () => {
-        mockExecute.mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, NAME: 'Kamal Perera', NIC: '901234567V', BASIC_SALARY: 0 }] });
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, NAME: 'Kamal Perera', NIC: '901234567V', BASIC_SALARY: 0 }] })
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
 
         const res = await request(app).post('/api/staff').send(VALID_BODY);
 
@@ -68,8 +76,9 @@ describe('PUT /api/staff/:id', () => {
 
     it('deactivates a staff member', async () => {
         mockExecute
-            .mockResolvedValueOnce({ rows: [{ ID: 1 }] })
-            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'inactive' }] });
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'active' }] })
+            .mockResolvedValueOnce({ rows: [{ ID: 1, STATUS: 'inactive' }] })
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
 
         const res = await request(app).put('/api/staff/1').send({ status: 'inactive' });
 
@@ -155,5 +164,53 @@ describe('GET /api/staff — warehouse scoping for warehouse_admin', () => {
         jest.dontMock('../middleware/permissionMiddleware');
         jest.dontMock('../db/dbUtils');
         jest.resetModules();
+    });
+});
+
+describe('staff audit logging', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('createStaff logs a create row (before_value null, after_value the new staff row)', async () => {
+        const INSERTED_ROW = { ID: 1, WAREHOUSE_ID: 1, NAME: 'Kamal Perera', NIC: '901234567V', BASIC_SALARY: 0 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [INSERTED_ROW] }) // INSERT
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).post('/api/staff').send(VALID_BODY);
+
+        expect(res.status).toBe(201);
+        const auditCall = mockExecute.mock.calls[1];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('create');
+        expect(auditCall[1].before_value).toBeNull();
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(INSERTED_ROW);
+    });
+
+    it('updateStaff logs an update row (before_value the pre-edit row, after_value the post-edit row)', async () => {
+        const BEFORE_ROW = { ID: 1, WAREHOUSE_ID: 1, STATUS: 'active' };
+        const AFTER_ROW = { ID: 1, WAREHOUSE_ID: 1, STATUS: 'inactive' };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // existence check
+            .mockResolvedValueOnce({ rows: [AFTER_ROW] }) // UPDATE
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).put('/api/staff/1').send({ status: 'inactive' });
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('update');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(AFTER_ROW);
+    });
+
+    it('rolls back the insert if the audit insert fails (createStaff)', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, NAME: 'Kamal Perera' }] }) // INSERT
+            .mockRejectedValueOnce(new Error('audit insert failed'));
+
+        const res = await request(app).post('/api/staff').send(VALID_BODY);
+
+        expect(res.status).toBe(500);
     });
 });

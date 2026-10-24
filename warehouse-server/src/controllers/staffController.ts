@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { execute } from '../db/dbUtils';
+import { execute, withTransaction } from '../db/dbUtils';
+import { logAudit } from '../utils/auditLog';
 
 export function warehouseScope(req: Request): number[] | null {
     const user = (req as any).user;
@@ -40,19 +41,23 @@ export const createStaff = async (req: Request, res: Response) => {
     }
 
     try {
-        const result = await execute<any>(
-            `INSERT INTO staff (warehouse_id, name, nic, designation, join_date, basic_salary, epf_no)
-             VALUES (:warehouse_id, :name, :nic, :designation, :join_date, :basic_salary, :epf_no)
-             RETURNING *`,
-            {
-                warehouse_id, name, nic,
-                designation: designation || null,
-                join_date,
-                basic_salary: basic_salary ?? 0,
-                epf_no: epf_no || null,
-            }
-        );
-        res.status(201).json(result.rows[0]);
+        const insertedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `INSERT INTO staff (warehouse_id, name, nic, designation, join_date, basic_salary, epf_no)
+                 VALUES (:warehouse_id, :name, :nic, :designation, :join_date, :basic_salary, :epf_no)
+                 RETURNING *`,
+                {
+                    warehouse_id, name, nic,
+                    designation: designation || null,
+                    join_date,
+                    basic_salary: basic_salary ?? 0,
+                    epf_no: epf_no || null,
+                }
+            );
+            await logAudit(exec, 'staff', result.rows[0].ID, 'create', (req as any).user?.id ?? null, null, result.rows[0]);
+            return result.rows[0];
+        });
+        res.status(201).json(insertedRow);
     } catch (err) {
         console.error('createStaff error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -65,7 +70,7 @@ export const updateStaff = async (req: Request, res: Response) => {
     const scope = warehouseScope(req);
 
     try {
-        let existingQuery = `SELECT id FROM staff WHERE id = :id`;
+        let existingQuery = `SELECT * FROM staff WHERE id = :id`;
         const existingParams: any = { id };
         if (scope !== null) {
             existingQuery += ` AND warehouse_id = ANY(:warehouse_ids)`;
@@ -75,13 +80,18 @@ export const updateStaff = async (req: Request, res: Response) => {
         if (existingResult.rows.length === 0) {
             return res.status(404).json({ message: 'Staff member not found' });
         }
+        const before = existingResult.rows[0];
 
         const setClauses = Object.keys(fields).map(key => `${key} = :${key}`).join(', ');
-        const result = await execute<any>(
-            `UPDATE staff SET ${setClauses} WHERE id = :id RETURNING *`,
-            { ...fields, id }
-        );
-        res.json(result.rows[0]);
+        const updatedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `UPDATE staff SET ${setClauses} WHERE id = :id RETURNING *`,
+                { ...fields, id }
+            );
+            await logAudit(exec, 'staff', result.rows[0].ID, 'update', (req as any).user?.id ?? null, before, result.rows[0]);
+            return result.rows[0];
+        });
+        res.json(updatedRow);
     } catch (err) {
         console.error('updateStaff error:', err);
         res.status(500).json({ message: 'Server error' });
