@@ -13,7 +13,13 @@ jest.mock('../middleware/permissionMiddleware', () => ({
     requirePermission: (_key: string) => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-jest.mock('../db/dbUtils', () => ({ execute: jest.fn() }));
+jest.mock('../db/dbUtils', () => {
+    const execute = jest.fn();
+    return {
+        execute,
+        withTransaction: jest.fn(async (fn: any) => fn(execute)),
+    };
+});
 
 import expenseRoutes from '../routes/expenseRoutes';
 import { execute } from '../db/dbUtils';
@@ -382,5 +388,70 @@ describe('GET /api/expenses — warehouse scoping for warehouse_admin', () => {
         jest.dontMock('../middleware/permissionMiddleware');
         jest.dontMock('../db/dbUtils');
         jest.resetModules();
+    });
+});
+
+describe('warehouse expense audit logging', () => {
+    beforeEach(() => { mockExecute.mockReset(); });
+
+    it('createExpense logs a create row (before_value null, after_value the new row)', async () => {
+        const INSERTED_ROW = { ID: 1, WAREHOUSE_ID: 1, EXPENSE_DATE: '2026-09-01', TRANSPORT_AMOUNT: 500, FUEL_AMOUNT: 1000, LABOUR_AMOUNT: 0, MEALS_AMOUNT: 0, OTHER_AMOUNT: 0 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [INSERTED_ROW] }) // INSERT
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).post('/api/expenses').send(VALID_BODY);
+
+        expect(res.status).toBe(201);
+        const auditCall = mockExecute.mock.calls[1];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('create');
+        expect(auditCall[1].before_value).toBeNull();
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(INSERTED_ROW);
+    });
+
+    it('updateExpense logs an update row (before_value the pre-edit row, after_value the post-edit row)', async () => {
+        const BEFORE_ROW = { ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 500 };
+        const AFTER_ROW = { ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 750 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // existence check
+            .mockResolvedValueOnce({ rows: [AFTER_ROW] }) // UPDATE
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).put('/api/expenses/1').send({ transport_amount: 750 });
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('update');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
+        expect(JSON.parse(auditCall[1].after_value)).toEqual(AFTER_ROW);
+    });
+
+    it('deleteExpense logs a delete row (before_value the deleted row, after_value null)', async () => {
+        const BEFORE_ROW = { ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 500 };
+        mockExecute
+            .mockResolvedValueOnce({ rows: [BEFORE_ROW] }) // existence check
+            .mockResolvedValueOnce({ rows: [] }) // DELETE
+            .mockResolvedValueOnce({ rows: [] }); // audit_log INSERT
+
+        const res = await request(app).delete('/api/expenses/1');
+
+        expect(res.status).toBe(200);
+        const auditCall = mockExecute.mock.calls[2];
+        expect(auditCall[0]).toMatch(/INSERT INTO audit_log/);
+        expect(auditCall[1].action).toBe('delete');
+        expect(JSON.parse(auditCall[1].before_value)).toEqual(BEFORE_ROW);
+        expect(auditCall[1].after_value).toBeNull();
+    });
+
+    it('rolls back the insert if the audit insert fails (createExpense)', async () => {
+        mockExecute
+            .mockResolvedValueOnce({ rows: [{ ID: 1, WAREHOUSE_ID: 1, TRANSPORT_AMOUNT: 500 }] }) // INSERT
+            .mockRejectedValueOnce(new Error('audit insert failed'));
+
+        const res = await request(app).post('/api/expenses').send(VALID_BODY);
+
+        expect(res.status).toBe(500);
     });
 });

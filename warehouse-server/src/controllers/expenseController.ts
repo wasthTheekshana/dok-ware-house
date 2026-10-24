@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { execute } from '../db/dbUtils';
+import { execute, withTransaction } from '../db/dbUtils';
 import { computeVariance } from '../utils/expenseVariance';
+import { logAudit } from '../utils/auditLog';
 
 export function warehouseScope(req: Request): number[] | null {
     const user = (req as any).user;
@@ -25,15 +26,19 @@ export const createExpense = async (req: Request, res: Response) => {
             fields[key] = amounts[key] ?? 0;
         }
 
-        const result = await execute<any>(
-            `INSERT INTO warehouse_expenses
-                (warehouse_id, expense_date, transport_amount, fuel_amount, labour_amount, meals_amount, other_amount, remarks, created_by)
-             VALUES
-                (:warehouse_id, :expense_date, :transport_amount, :fuel_amount, :labour_amount, :meals_amount, :other_amount, :remarks, :created_by)
-             RETURNING *`,
-            fields
-        );
-        res.status(201).json(result.rows[0]);
+        const insertedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `INSERT INTO warehouse_expenses
+                    (warehouse_id, expense_date, transport_amount, fuel_amount, labour_amount, meals_amount, other_amount, remarks, created_by)
+                 VALUES
+                    (:warehouse_id, :expense_date, :transport_amount, :fuel_amount, :labour_amount, :meals_amount, :other_amount, :remarks, :created_by)
+                 RETURNING *`,
+                fields
+            );
+            await logAudit(exec, 'warehouse_expenses', result.rows[0].ID, 'create', userId, null, result.rows[0]);
+            return result.rows[0];
+        });
+        res.status(201).json(insertedRow);
     } catch (err: any) {
         if (err.code === '23505') {
             return res.status(409).json({ message: 'An expense entry already exists for this warehouse and date' });
@@ -74,7 +79,7 @@ export const updateExpense = async (req: Request, res: Response) => {
     const scope = warehouseScope(req);
 
     try {
-        let existingQuery = `SELECT id FROM warehouse_expenses WHERE id = :id`;
+        let existingQuery = `SELECT * FROM warehouse_expenses WHERE id = :id`;
         const existingParams: any = { id };
         if (scope !== null) {
             existingQuery += ` AND warehouse_id = ANY(:warehouse_ids)`;
@@ -84,13 +89,18 @@ export const updateExpense = async (req: Request, res: Response) => {
         if (existingResult.rows.length === 0) {
             return res.status(404).json({ message: 'Expense entry not found' });
         }
+        const before = existingResult.rows[0];
 
         const setClauses = Object.keys(fields).map(key => `${key} = :${key}`).join(', ');
-        const result = await execute<any>(
-            `UPDATE warehouse_expenses SET ${setClauses}, updated_at = now() WHERE id = :id RETURNING *`,
-            { ...fields, id }
-        );
-        res.json(result.rows[0]);
+        const updatedRow = await withTransaction(async (exec) => {
+            const result = await exec<any>(
+                `UPDATE warehouse_expenses SET ${setClauses}, updated_at = now() WHERE id = :id RETURNING *`,
+                { ...fields, id }
+            );
+            await logAudit(exec, 'warehouse_expenses', result.rows[0].ID, 'update', (req as any).user?.id ?? null, before, result.rows[0]);
+            return result.rows[0];
+        });
+        res.json(updatedRow);
     } catch (err) {
         console.error('updateExpense error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -102,7 +112,7 @@ export const deleteExpense = async (req: Request, res: Response) => {
     const scope = warehouseScope(req);
 
     try {
-        let existingQuery = `SELECT id FROM warehouse_expenses WHERE id = :id`;
+        let existingQuery = `SELECT * FROM warehouse_expenses WHERE id = :id`;
         const existingParams: any = { id };
         if (scope !== null) {
             existingQuery += ` AND warehouse_id = ANY(:warehouse_ids)`;
@@ -112,8 +122,12 @@ export const deleteExpense = async (req: Request, res: Response) => {
         if (existingResult.rows.length === 0) {
             return res.status(404).json({ message: 'Expense entry not found' });
         }
+        const before = existingResult.rows[0];
 
-        await execute(`DELETE FROM warehouse_expenses WHERE id = :id`, { id });
+        await withTransaction(async (exec) => {
+            await exec(`DELETE FROM warehouse_expenses WHERE id = :id`, { id });
+            await logAudit(exec, 'warehouse_expenses', Number(id), 'delete', (req as any).user?.id ?? null, before, null);
+        });
         res.json({ message: 'Expense entry deleted' });
     } catch (err) {
         console.error('deleteExpense error:', err);
