@@ -161,7 +161,7 @@ const CompanyDetail: React.FC = () => {
                             <Td>{d.PRICE_PER_EMPTY_CARTON}</Td>
                             <Td>{d.PRICE_PER_BOX_STORED_MONTHLY}</Td>
                             <Td>
-                                <button onClick={() => startEditDept(d)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                                <button onClick={() => startEditDept(d)} className="text-slate-500 hover:text-brand-600" title="Edit"><Pencil size={16} /></button>
                             </Td>
                         </Tr>
                     )

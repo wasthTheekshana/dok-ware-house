@@ -319,7 +319,7 @@ const Expenses: React.FC = () => {
                             <Td>{entry.OTHER_AMOUNT.toFixed(2)}</Td>
                             <Td>{entry.REMARKS}</Td>
                             <Td>
-                                <button onClick={() => startEdit(entry)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                                <button onClick={() => startEdit(entry)} className="text-slate-500 hover:text-brand-600" title="Edit"><Pencil size={16} /></button>
                             </Td>
                         </Tr>
                     )

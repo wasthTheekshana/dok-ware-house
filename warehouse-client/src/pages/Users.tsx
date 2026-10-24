@@ -245,9 +245,9 @@ const Users: React.FC = () => {
                             <Td>{u.NAME}</Td>
                             <Td>{ROLE_OPTIONS.find((r) => r.value === u.ROLE)?.label ?? u.ROLE}</Td>
                             <Td>{(u.WAREHOUSE_IDS || []).map((id) => warehouses.find((w) => w.ID === id)?.NAME || id).join(', ')}</Td>
-                            <Td><Badge tone={u.STATUS === 'active' ? 'success' : 'neutral'}>{u.STATUS}</Badge></Td>
+                            <Td><Badge tone={u.STATUS === 'active' ? 'success' : 'neutral'}>{u.STATUS === 'active' ? 'Active' : 'Inactive'}</Badge></Td>
                             <Td>
-                                <button onClick={() => startEdit(u)} className="text-blue-600 hover:text-blue-700 text-xs font-medium">Edit</button>
+                                <button onClick={() => startEdit(u)} className="text-brand-600 hover:text-brand-700 text-xs font-medium">Edit</button>
                             </Td>
                         </Tr>
                     )

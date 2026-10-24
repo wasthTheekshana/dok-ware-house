@@ -81,7 +81,7 @@ const Warehouses: React.FC = () => {
                         <Td>{w.ADDRESS}</Td>
                         <Td>{w.DEPARTMENT_COUNT}</Td>
                         <Td>
-                            <Badge tone={w.STATUS === 'active' ? 'success' : 'neutral'}>{w.STATUS}</Badge>
+                            <Badge tone={w.STATUS === 'active' ? 'success' : 'neutral'}>{w.STATUS === 'active' ? 'Active' : 'Inactive'}</Badge>
                         </Td>
                     </Tr>
                 ))}

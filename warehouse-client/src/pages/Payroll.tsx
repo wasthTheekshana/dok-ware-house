@@ -200,7 +200,7 @@ const Payroll: React.FC = () => {
             </Card>
             )}
 
-            <Table headers={['Staff', 'Period', 'Basic', 'OT', 'Deductions', 'EPF (Emp.)', 'EPF (Emplr.)', 'ETF', 'Net Salary', 'Status', 'Actions']}>
+            <Table headers={['Staff', 'Period', 'Basic', 'OT', 'Deductions', 'EPF (Emp.)', 'EPF (Emplr.)', 'ETF', 'Net Salary', 'Status', 'Actions']} empty={records.length === 0}>
                 {records.map((p) =>
                     editingId === p.ID ? (
                         <Tr key={p.ID} className="bg-slate-50">

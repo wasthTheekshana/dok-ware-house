@@ -242,7 +242,7 @@ const BoxEvents: React.FC = () => {
                             {canManageBoxEvents && (
                                 <Td>
                                     <div className="flex gap-2">
-                                        <button onClick={() => startEdit(e)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                                        <button onClick={() => startEdit(e)} className="text-slate-500 hover:text-brand-600" title="Edit"><Pencil size={16} /></button>
                                         <button onClick={() => deleteEvent(e.ID)} className="text-slate-500 hover:text-red-600" title="Delete"><Trash2 size={16} /></button>
                                     </div>
                                 </Td>

@@ -214,9 +214,9 @@ const Staff: React.FC = () => {
                             <Td>{s.JOIN_DATE}</Td>
                             <Td>{s.BASIC_SALARY.toFixed(2)}</Td>
                             <Td>{s.EPF_NO}</Td>
-                            <Td><Badge tone={s.STATUS === 'active' ? 'success' : 'neutral'}>{s.STATUS}</Badge></Td>
+                            <Td><Badge tone={s.STATUS === 'active' ? 'success' : 'neutral'}>{s.STATUS === 'active' ? 'Active' : 'Inactive'}</Badge></Td>
                             <Td>
-                                <button onClick={() => startEdit(s)} className="text-slate-500 hover:text-blue-600" title="Edit"><Pencil size={16} /></button>
+                                <button onClick={() => startEdit(s)} className="text-slate-500 hover:text-brand-600" title="Edit"><Pencil size={16} /></button>
                             </Td>
                         </Tr>
                     )

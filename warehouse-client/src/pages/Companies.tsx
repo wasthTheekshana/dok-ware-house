@@ -66,7 +66,7 @@ const Companies: React.FC = () => {
                 {companies.map((c) => (
                     <Tr key={c.ID}>
                         <Td>
-                            <Link to={`/companies/${c.ID}`} className="text-blue-600 font-medium">{c.NAME}</Link>
+                            <Link to={`/companies/${c.ID}`} className="text-brand-600 font-medium">{c.NAME}</Link>
                         </Td>
                         <Td>{c.CODE}</Td>
                         <Td>{c.DEPARTMENT_COUNT}</Td>

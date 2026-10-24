@@ -41,7 +41,7 @@ const Reports: React.FC = () => {
                 </ResponsiveContainer>
             </Card>
 
-            <Table headers={['Company', 'Total Boxes']} title="Company-wise Box Summary">
+            <Table headers={['Company', 'Total Boxes']} title="Company-wise Box Summary" empty={companySummary.length === 0}>
                 {companySummary.map((c) => (
                     <Tr key={c.COMPANY_ID}>
                         <Td>{c.COMPANY_NAME}</Td>
